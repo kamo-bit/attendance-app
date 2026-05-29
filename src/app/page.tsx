@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { authClient } from "@/lib/auth-client"
 import { getSalarySettings, updateSalarySettings, saveAttendance, getTodayAttendance } from "@/app/actions"
 import { getPayrollPeriod } from "@/lib/utils"
+import { toast } from "sonner"
 
 export default function Home() {
   const router = useRouter()
@@ -111,6 +112,7 @@ export default function Home() {
   const handleSaveWage = async (wage: number) => {
     setHourlyWage(wage)
     await updateSalarySettings(wage)
+    toast.success("Salary updated successfully")
   }
 
   const handleSaveAttendance = async () => {
@@ -138,8 +140,10 @@ export default function Home() {
         payrollPeriodEnd: period.end,
         status: clockOut ? "completed" : "draft"
       })
+      toast.success("Attendance saved successfully")
     } catch (e) {
       console.error(e)
+      toast.error("Failed to save attendance")
     } finally {
       setIsSaving(false)
     }

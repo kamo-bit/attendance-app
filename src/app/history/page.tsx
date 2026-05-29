@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog"
 import { authClient } from "@/lib/auth-client"
 import { getAttendanceHistory, deleteAttendance, updateAttendance } from "@/app/actions"
+import { toast } from "sonner"
 
 export default function HistoryPage() {
   const router = useRouter()
@@ -50,8 +51,13 @@ export default function HistoryPage() {
   }, [session])
 
   const handleDelete = async (id: string) => {
-    await deleteAttendance(id)
-    await loadRecords()
+    try {
+      await deleteAttendance(id)
+      await loadRecords()
+      toast.success("Record deleted successfully")
+    } catch (error) {
+      toast.error("Failed to delete record")
+    }
   }
 
   const handleEditClick = (record: any) => {
@@ -64,9 +70,14 @@ export default function HistoryPage() {
 
   const handleSaveEdit = async () => {
     if (!editingRecord) return
-    await updateAttendance(editingRecord.id, editClockIn, editClockOut, editSalary)
-    setIsEditDialogOpen(false)
-    await loadRecords()
+    try {
+      await updateAttendance(editingRecord.id, editClockIn, editClockOut, editSalary)
+      setIsEditDialogOpen(false)
+      await loadRecords()
+      toast.success("Record updated successfully")
+    } catch (error) {
+      toast.error("Failed to update record")
+    }
   }
 
   if (isPending || !session) return null
