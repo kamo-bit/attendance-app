@@ -151,3 +151,22 @@ export async function getYearlySummary(year: string) {
     totalSalaryYen: totalSalary,
   }
 }
+
+export async function getResetLinkForEmail(email: string) {
+  try {
+    // Note: This is purely for development/testing
+    const { developmentResetLinks } = await import("@/lib/auth");
+    
+    // Give Better Auth a moment to insert the token
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    const url = developmentResetLinks.get(email);
+    if (url) {
+      return { url };
+    }
+    return null;
+  } catch (e) {
+    console.error(e)
+    return null;
+  }
+}

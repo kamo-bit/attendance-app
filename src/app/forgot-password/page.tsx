@@ -9,14 +9,17 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { authClient } from "@/lib/auth-client"
+import { getResetLinkForEmail } from "@/app/actions"
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle")
+  const [resetLink, setResetLink] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setStatus("loading")
+    setResetLink(null)
     
     // As per Better Auth docs, it will generate a token and call sendResetPassword
     const { error } = await authClient.requestPasswordReset({
@@ -28,6 +31,11 @@ export default function ForgotPasswordPage() {
       setStatus("error")
     } else {
       setStatus("success")
+      // Fetch the actual generated link for display (Development ONLY)
+      const data = await getResetLinkForEmail(email)
+      if (data) {
+        setResetLink(data.url)
+      }
     }
   }
 
@@ -46,11 +54,16 @@ export default function ForgotPasswordPage() {
               <Mail className="w-8 h-8 mx-auto" />
               <h3 className="font-semibold text-lg">Reset Link Generated!</h3>
               <p className="text-sm opacity-80 pb-2">
-                Buka <strong>Terminal / CMD / VSCode</strong> tempat Anda menjalankan <code>npm run dev</code>. Anda akan melihat link aslinya tercetak di sana!
+                For testing purposes, the reset link is displayed below:
               </p>
-              <p className="text-xs text-primary/70">
-                (Silakan copy link yang ada di terminal dan paste di browser Anda)
-              </p>
+              
+              {resetLink ? (
+                <Button className="w-full" onClick={() => window.location.href = resetLink}>
+                  Click Here to Reset Password
+                </Button>
+              ) : (
+                <div className="animate-pulse text-sm">Generating link...</div>
+              )}
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">

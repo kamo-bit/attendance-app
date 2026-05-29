@@ -3,6 +3,12 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 
+const globalForResetLinks = globalThis as unknown as {
+  _resetLinks: Map<string, string>
+}
+export const developmentResetLinks = globalForResetLinks._resetLinks || new Map<string, string>()
+if (process.env.NODE_ENV !== "production") globalForResetLinks._resetLinks = developmentResetLinks
+
 export const auth = betterAuth({
     baseURL: process.env.BETTER_AUTH_URL 
         || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000"),
@@ -33,6 +39,9 @@ export const auth = betterAuth({
     emailAndPassword: {
         enabled: true,
         sendResetPassword: async ({ user, url, token }) => {
+            // Save link in memory for development display
+            developmentResetLinks.set(user.email, url);
+            
             console.log("\n\n==========================================")
             console.log("RESET PASSWORD LINK REQUESTED:")
             console.log(`User: ${user.email}`)
