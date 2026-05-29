@@ -1,7 +1,8 @@
 "use server"
 
 import { db } from "@/db"
-import { attendanceRecords, salarySettings, verifications, users } from "@/db/schema"
+import * as schema from "@/db/schema"
+import { attendanceRecords, salarySettings, verifications, users, accounts } from "@/db/schema"
 import { eq, and, gte, lte, desc } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
@@ -70,17 +71,17 @@ export async function saveAttendance(data: any) {
 
 export async function getAttendanceHistory() {
   const user = await getSession()
-  return await db.select().from(attendanceRecords)
-    .where(eq(attendanceRecords.userId, user.id))
-    .orderBy(desc(attendanceRecords.attendanceDate))
+  return await db.select().from(schema.attendanceRecords)
+    .where(eq(schema.attendanceRecords.userId, user.id))
+    .orderBy(desc(schema.attendanceRecords.attendanceDate))
 }
 
 export async function deleteAttendance(id: string) {
   const user = await getSession()
-  await db.delete(attendanceRecords).where(
+  await db.delete(schema.attendanceRecords).where(
     and(
-      eq(attendanceRecords.id, id),
-      eq(attendanceRecords.userId, user.id)
+      eq(schema.attendanceRecords.id, id),
+      eq(schema.attendanceRecords.userId, user.id)
     )
   )
   revalidatePath('/history')
@@ -88,12 +89,12 @@ export async function deleteAttendance(id: string) {
 
 export async function updateAttendance(id: string, data: any) {
   const user = await getSession()
-  await db.update(attendanceRecords)
+  await db.update(schema.attendanceRecords)
     .set({ ...data, updatedAt: new Date() })
     .where(
       and(
-        eq(attendanceRecords.id, id),
-        eq(attendanceRecords.userId, user.id)
+        eq(schema.attendanceRecords.id, id),
+        eq(schema.attendanceRecords.userId, user.id)
       )
     )
   revalidatePath('/history')
@@ -101,10 +102,10 @@ export async function updateAttendance(id: string, data: any) {
 
 export async function getTodayAttendance(date: string) {
   const user = await getSession()
-  const records = await db.select().from(attendanceRecords).where(
+  const records = await db.select().from(schema.attendanceRecords).where(
     and(
-      eq(attendanceRecords.userId, user.id),
-      eq(attendanceRecords.attendanceDate, date)
+      eq(schema.attendanceRecords.userId, user.id),
+      eq(schema.attendanceRecords.attendanceDate, date)
     )
   ).limit(1)
   
@@ -113,11 +114,11 @@ export async function getTodayAttendance(date: string) {
 
 export async function getSalarySummary(periodStart: string, periodEnd: string) {
   const user = await getSession()
-  const records = await db.select().from(attendanceRecords).where(
+  const records = await db.select().from(schema.attendanceRecords).where(
     and(
-      eq(attendanceRecords.userId, user.id),
-      eq(attendanceRecords.payrollPeriodStart, periodStart),
-      eq(attendanceRecords.payrollPeriodEnd, periodEnd)
+      eq(schema.attendanceRecords.userId, user.id),
+      eq(schema.attendanceRecords.payrollPeriodStart, periodStart),
+      eq(schema.attendanceRecords.payrollPeriodEnd, periodEnd)
     )
   )
   
@@ -161,7 +162,7 @@ export async function getLatestResetLink(email: string) {
     
     // 1. Find user by email
     const user = await db.query.users.findFirst({
-      where: eq(users.email, email)
+      where: eq(schema.users.email, email)
     });
     
     if (!user) return null;
@@ -170,8 +171,8 @@ export async function getLatestResetLink(email: string) {
     const identifier = `reset-password:${user.id}`;
     
     const latestVerif = await db.query.verifications.findFirst({
-      where: eq(verifications.identifier, identifier),
-      orderBy: [desc(verifications.createdAt)]
+      where: eq(schema.verifications.identifier, identifier),
+      orderBy: [desc(schema.verifications.createdAt)]
     });
     
     if (latestVerif) {
@@ -187,5 +188,54 @@ export async function getLatestResetLink(email: string) {
   } catch (e) {
     console.error(e)
     return null;
+  }
+}
+
+export async function directResetPassword(email: string, newPassword: string) {
+  try {
+    const { hashPassword } = await import("better-auth/crypto");
+    
+    // 1. Find user by email
+    const user = await db.query.users.findFirst({
+      where: eq(schema.users.email, email)
+    });
+    
+    if (!user) {
+      return { error: "Email not found in our system" };
+    }
+    
+    // 2. Hash the new password
+    const hashedPassword = await hashPassword(newPassword);
+    
+    // 3. Find if they have a credential account
+    const existingAccount = await db.query.accounts.findFirst({
+      where: and(
+        eq(schema.accounts.userId, user.id),
+        eq(schema.accounts.providerId, "credential")
+      )
+    });
+    
+    if (existingAccount) {
+      // Update existing password
+      await db.update(schema.accounts)
+        .set({ password: hashedPassword as string, updatedAt: new Date() })
+        .where(eq(schema.accounts.id, existingAccount.id));
+    } else {
+      // Create a new credential account for this user so they can login with password
+      await db.insert(schema.accounts).values({
+        id: crypto.randomUUID(),
+        userId: user.id,
+        accountId: user.email, // Better Auth uses email as accountId for credentials
+        providerId: "credential",
+        password: hashedPassword as string,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
+    
+    return { success: true };
+  } catch (e: any) {
+    console.error("Direct reset failed:", e);
+    return { error: e.message || "Failed to reset password" };
   }
 }

@@ -1,45 +1,47 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Eye, EyeOff, Lock, CheckCircle2 } from "lucide-react"
+import { CheckCircle2, AlertCircle, ArrowLeft } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { authClient } from "@/lib/auth-client"
+import { directResetPassword } from "@/app/actions"
 
 export default function ResetPasswordPage() {
-  const router = useRouter()
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
+  const [confirmPassword, setConfirmPassword] = useState("")
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle")
   const [errorMsg, setErrorMsg] = useState("")
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (password !== confirmPassword) {
+      setStatus("error")
+      setErrorMsg("Passwords do not match")
+      return
+    }
+
+    if (password.length < 8) {
+      setStatus("error")
+      setErrorMsg("Password must be at least 8 characters")
+      return
+    }
+    
     setStatus("loading")
     setErrorMsg("")
     
-    // Extract token from URL
-    const searchParams = new URLSearchParams(window.location.search);
-    const token = searchParams.get("token") || "";
-
-    const { error } = await authClient.resetPassword({
-      newPassword: password,
-      token: token || undefined,
-    } as any)
+    const res = await directResetPassword(email, password)
     
-    if (error) {
+    if (res?.error) {
       setStatus("error")
-      setErrorMsg(error.message || "Failed to reset password")
-    } else {
+      setErrorMsg(res.error)
+    } else if (res?.success) {
       setStatus("success")
-      setTimeout(() => {
-        router.push("/login")
-      }, 2000)
     }
   }
 
@@ -47,64 +49,68 @@ export default function ResetPasswordPage() {
     <div className="container flex items-center justify-center min-h-[80vh] py-10 px-4">
       <Card className="w-full max-w-md shadow-xl border rounded-3xl overflow-hidden">
         <CardHeader className="space-y-1 text-center bg-muted/30 pb-8 pt-8">
-          <CardTitle className="text-2xl font-bold tracking-tight">Create New Password</CardTitle>
+          <CardTitle className="text-2xl font-bold tracking-tight">Set New Password</CardTitle>
           <CardDescription>
-            Please enter your new password below.
+            Enter your email and your new password below.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 pt-6">
           {status === "success" ? (
-            <div className="bg-emerald-500/10 text-emerald-600 p-6 rounded-lg text-center space-y-3">
-              <CheckCircle2 className="w-12 h-12 mx-auto" />
-              <h3 className="font-semibold text-lg">Password Reset Successfully</h3>
-              <p className="text-sm text-emerald-600/80">
-                You can now log in with your new password. Redirecting to login...
-              </p>
+            <div className="bg-primary/10 text-primary p-4 rounded-lg text-center space-y-2">
+              <CheckCircle2 className="w-8 h-8 mx-auto" />
+              <p className="font-medium">Password reset successfully!</p>
+              <p className="text-sm opacity-80">You can now login with your new password.</p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="password">New Password</Label>
-                <div className="relative">
-                  <Input 
-                    id="password" 
-                    type={showPassword ? "text" : "password"} 
-                    required 
-                    value={password} 
-                    onChange={(e) => setPassword(e.target.value)} 
-                    minLength={8}
-                  />
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="sm" 
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-muted-foreground" 
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
-              
               {status === "error" && (
-                <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
+                <div className="bg-destructive/15 text-destructive p-3 rounded-lg text-sm font-medium flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" />
                   {errorMsg}
                 </div>
               )}
-              
-              <Button className="w-full mt-4" type="submit" disabled={status === "loading" || !password}>
-                {status === "loading" ? "Saving..." : <><Lock className="mr-2 h-4 w-4" /> Save New Password</>}
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="name@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">New Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={status === "loading"}>
+                {status === "loading" ? "Saving..." : "Save New Password"}
               </Button>
             </form>
           )}
         </CardContent>
-        <CardFooter className="flex flex-col space-y-4 pb-8">
-          <div className="text-sm text-center text-muted-foreground">
-            Remembered your password?{" "}
-            <Link href="/login" className="font-medium text-primary hover:underline">
-              Sign in
-            </Link>
-          </div>
+        <CardFooter className="bg-muted/10 border-t py-4 justify-center flex-col gap-2">
+          <Link href="/login" className="flex items-center gap-2 text-sm font-medium text-primary hover:underline">
+            <ArrowLeft className="w-4 h-4" />
+            Back to login
+          </Link>
         </CardFooter>
       </Card>
     </div>
