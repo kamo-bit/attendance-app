@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { authClient } from "@/lib/auth-client"
 import Link from "next/link"
-import { UserPlus, Eye, EyeOff } from "lucide-react"
+import { UserPlus, Eye, EyeOff, CheckCircle2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -18,6 +18,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [success, setSuccess] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -35,7 +36,11 @@ export default function RegisterPage() {
       setError(error.message || "Failed to register")
       setLoading(false)
     } else {
-      router.push("/")
+      setSuccess(true)
+      // Redirect to login after 2 seconds so user sees success message
+      setTimeout(() => {
+        router.push("/login")
+      }, 2000)
     }
   }
 
@@ -49,35 +54,48 @@ export default function RegisterPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {error && <div className="text-sm text-center text-destructive">{error}</div>}
-          <form onSubmit={handleRegister} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
-              <Input id="name" type="text" placeholder="John Doe" required value={name} onChange={(e) => setName(e.target.value)} />
+          {success ? (
+            <div className="py-6 text-center space-y-4">
+              <CheckCircle2 className="w-14 h-14 text-emerald-500 mx-auto" />
+              <h3 className="text-lg font-semibold">Account Created!</h3>
+              <p className="text-sm text-muted-foreground">
+                Your account has been created successfully.<br />
+                Redirecting to login page...
+              </p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="m@example.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Input id="password" type={showPassword ? "text" : "password"} required value={password} onChange={(e) => setPassword(e.target.value)} />
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  size="sm" 
-                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-muted-foreground" 
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          ) : (
+            <>
+              {error && <div className="text-sm text-center text-destructive bg-destructive/10 p-3 rounded-md">{error}</div>}
+              <form onSubmit={handleRegister} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Name</Label>
+                  <Input id="name" type="text" placeholder="John Doe" required value={name} onChange={(e) => setName(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input id="email" type="email" placeholder="m@example.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <div className="relative">
+                    <Input id="password" type={showPassword ? "text" : "password"} required value={password} onChange={(e) => setPassword(e.target.value)} />
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="sm" 
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-muted-foreground" 
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+                <Button className="w-full" type="submit" disabled={loading}>
+                  {loading ? "Creating account..." : <><UserPlus className="mr-2 h-4 w-4" /> Sign Up</>}
                 </Button>
-              </div>
-            </div>
-            <Button className="w-full" type="submit" disabled={loading}>
-              {loading ? "Creating account..." : <><UserPlus className="mr-2 h-4 w-4" /> Sign Up</>}
-            </Button>
-          </form>
+              </form>
+            </>
+          )}
           
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
