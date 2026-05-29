@@ -324,17 +324,23 @@ export default function HistoryPage() {
                   </RadioGroup>
 
                   <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-2 items-center bg-muted/50 p-3 rounded-lg">
-                      <div className="text-sm font-medium col-span-2">Break 1</div>
-                      <Input type="time" value={editBreak1From} onChange={(e) => setEditBreak1From(e.target.value)} className="h-9 w-full" />
-                      <Input type="time" value={editBreak1To} onChange={(e) => setEditBreak1To(e.target.value)} className="h-9 w-full" />
+                    <div className="flex flex-col sm:flex-row gap-2 sm:items-center justify-between bg-muted/50 p-3 rounded-lg">
+                      <div className="text-sm font-medium shrink-0">Break 1</div>
+                      <div className="flex items-center space-x-2 w-full sm:w-auto flex-1 max-w-[240px]">
+                        <Input type="time" value={editBreak1From} onChange={(e) => setEditBreak1From(e.target.value)} className="h-9 w-full min-w-[90px]" />
+                        <span className="text-muted-foreground shrink-0 text-sm">to</span>
+                        <Input type="time" value={editBreak1To} onChange={(e) => setEditBreak1To(e.target.value)} className="h-9 w-full min-w-[90px]" />
+                      </div>
                     </div>
                     
                     {editBreakCount === "2" && (
-                      <div className="grid grid-cols-2 gap-2 items-center bg-muted/50 p-3 rounded-lg">
-                        <div className="text-sm font-medium col-span-2">Break 2</div>
-                        <Input type="time" value={editBreak2From} onChange={(e) => setEditBreak2From(e.target.value)} className="h-9 w-full" />
-                        <Input type="time" value={editBreak2To} onChange={(e) => setEditBreak2To(e.target.value)} className="h-9 w-full" />
+                      <div className="flex flex-col sm:flex-row gap-2 sm:items-center justify-between bg-muted/50 p-3 rounded-lg">
+                        <div className="text-sm font-medium shrink-0">Break 2</div>
+                        <div className="flex items-center space-x-2 w-full sm:w-auto flex-1 max-w-[240px]">
+                          <Input type="time" value={editBreak2From} onChange={(e) => setEditBreak2From(e.target.value)} className="h-9 w-full min-w-[90px]" />
+                          <span className="text-muted-foreground shrink-0 text-sm">to</span>
+                          <Input type="time" value={editBreak2To} onChange={(e) => setEditBreak2To(e.target.value)} className="h-9 w-full min-w-[90px]" />
+                        </div>
                       </div>
                     )}
                   </div>

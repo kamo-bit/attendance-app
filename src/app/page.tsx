@@ -286,22 +286,22 @@ export default function Home() {
                     </RadioGroup>
 
                     <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4 items-center bg-muted/50 p-4 rounded-lg">
-                        <div className="text-sm font-medium">Break 1</div>
-                        <div className="flex items-center space-x-2 w-full">
-                          <Input type="time" value={break1From} onChange={(e) => setBreak1From(e.target.value)} className="h-9 flex-1 w-full" />
-                          <span className="text-muted-foreground shrink-0">to</span>
-                          <Input type="time" value={break1To} onChange={(e) => setBreak1To(e.target.value)} className="h-9 flex-1 w-full" />
+                      <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between bg-muted/50 p-4 rounded-lg">
+                        <div className="text-sm font-medium shrink-0">Break 1</div>
+                        <div className="flex items-center space-x-2 w-full sm:w-auto flex-1 max-w-[240px]">
+                          <Input type="time" value={break1From} onChange={(e) => setBreak1From(e.target.value)} className="h-9 flex-1 w-full min-w-[90px]" />
+                          <span className="text-muted-foreground shrink-0 text-sm">to</span>
+                          <Input type="time" value={break1To} onChange={(e) => setBreak1To(e.target.value)} className="h-9 flex-1 w-full min-w-[90px]" />
                         </div>
                       </div>
                       
                       {breakCount === "2" && (
-                        <div className="grid grid-cols-2 gap-4 items-center bg-muted/50 p-4 rounded-lg animate-in fade-in zoom-in duration-300">
-                          <div className="text-sm font-medium">Break 2</div>
-                          <div className="flex items-center space-x-2 w-full">
-                            <Input type="time" value={break2From} onChange={(e) => setBreak2From(e.target.value)} className="h-9 flex-1 w-full" />
-                            <span className="text-muted-foreground shrink-0">to</span>
-                            <Input type="time" value={break2To} onChange={(e) => setBreak2To(e.target.value)} className="h-9 flex-1 w-full" />
+                        <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between bg-muted/50 p-4 rounded-lg animate-in fade-in zoom-in duration-300">
+                          <div className="text-sm font-medium shrink-0">Break 2</div>
+                          <div className="flex items-center space-x-2 w-full sm:w-auto flex-1 max-w-[240px]">
+                            <Input type="time" value={break2From} onChange={(e) => setBreak2From(e.target.value)} className="h-9 flex-1 w-full min-w-[90px]" />
+                            <span className="text-muted-foreground shrink-0 text-sm">to</span>
+                            <Input type="time" value={break2To} onChange={(e) => setBreak2To(e.target.value)} className="h-9 flex-1 w-full min-w-[90px]" />
                           </div>
                         </div>
                       )}
