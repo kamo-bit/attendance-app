@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { authClient } from "@/lib/auth-client"
-import { getResetLinkForEmail } from "@/app/actions"
+import { getLatestResetLink } from "@/app/actions"
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
@@ -32,7 +32,7 @@ export default function ForgotPasswordPage() {
     } else {
       setStatus("success")
       // Fetch the actual generated link for display (Development ONLY)
-      const data = await getResetLinkForEmail(email)
+      const data = await getLatestResetLink(email)
       if (data) {
         setResetLink(data.url)
       }

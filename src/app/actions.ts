@@ -1,7 +1,7 @@
 "use server"
 
 import { db } from "@/db"
-import { attendanceRecords, salarySettings, verifications } from "@/db/schema"
+import { attendanceRecords, salarySettings, verifications, users } from "@/db/schema"
 import { eq, and, gte, lte, desc } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
@@ -152,18 +152,37 @@ export async function getYearlySummary(year: string) {
   }
 }
 
-export async function getResetLinkForEmail(email: string) {
+export async function getLatestResetLink(email: string) {
   try {
     // Note: This is purely for development/testing
-    const { developmentResetLinks } = await import("@/lib/auth");
     
     // Give Better Auth a moment to insert the token
     await new Promise(resolve => setTimeout(resolve, 1500));
     
-    const url = developmentResetLinks.get(email);
-    if (url) {
-      return { url };
+    // 1. Find user by email
+    const user = await db.query.users.findFirst({
+      where: eq(users.email, email)
+    });
+    
+    if (!user) return null;
+    
+    // 2. Find the latest verification token for this user
+    const identifier = `reset-password:${user.id}`;
+    
+    const latestVerif = await db.query.verifications.findFirst({
+      where: eq(verifications.identifier, identifier),
+      orderBy: [desc(verifications.createdAt)]
+    });
+    
+    if (latestVerif) {
+      // 3. Extract the token (which IS the identifier part!)
+      const token = latestVerif.identifier.split(":")[1];
+      if (token) {
+        // Construct the EXACT frontend URL with the token
+        return { url: `/reset-password?token=${token}` };
+      }
     }
+    
     return null;
   } catch (e) {
     console.error(e)
