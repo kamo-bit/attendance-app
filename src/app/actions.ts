@@ -117,8 +117,8 @@ export async function getSalarySummary(periodStart: string, periodEnd: string) {
   const records = await db.select().from(schema.attendanceRecords).where(
     and(
       eq(schema.attendanceRecords.userId, user.id),
-      eq(schema.attendanceRecords.payrollPeriodStart, periodStart),
-      eq(schema.attendanceRecords.payrollPeriodEnd, periodEnd)
+      gte(schema.attendanceRecords.attendanceDate, periodStart),
+      lte(schema.attendanceRecords.attendanceDate, periodEnd)
     )
   )
   
