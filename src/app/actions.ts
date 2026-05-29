@@ -1,7 +1,7 @@
 "use server"
 
 import { db } from "@/db"
-import { attendanceRecords, salarySettings } from "@/db/schema"
+import { attendanceRecords, salarySettings, verifications } from "@/db/schema"
 import { eq, and, gte, lte, desc } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
@@ -149,5 +149,28 @@ export async function getYearlySummary(year: string) {
     totalWorkMinutes: totalMins,
     totalWorkDays: records.filter(r => r.clockIn).length,
     totalSalaryYen: totalSalary,
+  }
+}
+
+export async function getLatestResetLink() {
+  try {
+    // Note: In a real app, returning reset tokens to the client is a security risk.
+    // This is purely for development/testing as requested by the user.
+    
+    // Give Better Auth a moment to insert the token
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    const latestVerif = await db.query.verifications.findFirst({
+      orderBy: [desc(verifications.createdAt)]
+    });
+    
+    if (latestVerif && latestVerif.value) {
+      // The token itself is the value
+      return { url: `/reset-password?token=${latestVerif.value}` };
+    }
+    return null;
+  } catch (e) {
+    console.error(e)
+    return null;
   }
 }

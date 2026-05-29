@@ -9,14 +9,17 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { authClient } from "@/lib/auth-client"
+import { getLatestResetLink } from "@/app/actions"
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle")
+  const [resetLink, setResetLink] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setStatus("loading")
+    setResetLink(null)
     
     // As per Better Auth docs, it will generate a token and call sendResetPassword
     const { error } = await authClient.requestPasswordReset({
@@ -28,6 +31,11 @@ export default function ForgotPasswordPage() {
       setStatus("error")
     } else {
       setStatus("success")
+      // Fetch the link (Development ONLY)
+      const data = await getLatestResetLink()
+      if (data) {
+        setResetLink(data.url)
+      }
     }
   }
 
@@ -37,18 +45,27 @@ export default function ForgotPasswordPage() {
         <CardHeader className="space-y-1 text-center bg-muted/30 pb-8 pt-8">
           <CardTitle className="text-2xl font-bold tracking-tight">Reset Password</CardTitle>
           <CardDescription>
-            Enter your email address and we will send you a link to reset your password.
+            Enter your email address and we will generate a link to reset your password.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 pt-6">
           {status === "success" ? (
-            <div className="bg-primary/10 text-primary p-4 rounded-lg text-center space-y-2">
+            <div className="bg-primary/10 text-primary p-6 rounded-xl text-center space-y-4">
               <Mail className="w-8 h-8 mx-auto" />
-              <h3 className="font-semibold">Check your email</h3>
-              <p className="text-sm">
-                If the email matches an account, we have sent a reset link to it. 
-                <br />(For local testing, check your terminal console!)
+              <h3 className="font-semibold text-lg">Reset Link Generated!</h3>
+              <p className="text-sm opacity-80 pb-2">
+                For testing purposes, the reset link is displayed below:
               </p>
+              
+              {resetLink ? (
+                <Button asChild className="w-full">
+                  <Link href={resetLink}>
+                    Click Here to Reset Password
+                  </Link>
+                </Button>
+              ) : (
+                <div className="animate-pulse text-sm">Generating link...</div>
+              )}
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
