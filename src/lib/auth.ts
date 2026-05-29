@@ -7,6 +7,13 @@ export const auth = betterAuth({
         provider: "sqlite",
     }),
     emailAndPassword: {
-        enabled: true
+        enabled: true,
+        sendResetPassword: async ({ user, url, token }) => {
+            console.log("\n\n==========================================")
+            console.log("RESET PASSWORD LINK REQUESTED:")
+            console.log(`User: ${user.email}`)
+            console.log(`Link: ${url}`)
+            console.log("==========================================\n\n")
+        },
     }
 });
