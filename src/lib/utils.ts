@@ -33,9 +33,10 @@ export function getPayrollPeriod(dateStr: string) {
   const start = new Date(startYear, startMonth, 21)
   const end = new Date(endYear, endMonth, 20)
   
+  const pad = (n: number) => n.toString().padStart(2, '0')
   return {
-    start: start.toISOString().split('T')[0],
-    end: end.toISOString().split('T')[0]
+    start: `${startYear}-${pad(startMonth + 1)}-21`,
+    end: `${endYear}-${pad(endMonth + 1)}-20`
   }
 }
 
