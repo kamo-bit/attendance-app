@@ -58,10 +58,8 @@ export default function ForgotPasswordPage() {
               </p>
               
               {resetLink ? (
-                <Button asChild className="w-full">
-                  <Link href={resetLink}>
-                    Click Here to Reset Password
-                  </Link>
+                <Button className="w-full" onClick={() => window.location.href = resetLink}>
+                  Click Here to Reset Password
                 </Button>
               ) : (
                 <div className="animate-pulse text-sm">Generating link...</div>
