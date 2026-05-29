@@ -2,8 +2,10 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { Menu } from "lucide-react"
+import { usePathname, useRouter } from "next/navigation"
+import { Menu, LogOut } from "lucide-react"
+
+import { authClient } from "@/lib/auth-client"
 
 import { ThemeToggle } from "@/components/theme-toggle"
 import { cn } from "@/lib/utils"
@@ -12,7 +14,15 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/co
 
 export function MainNav() {
   const pathname = usePathname()
+  const router = useRouter()
   const [open, setOpen] = useState(false)
+  const { data: session, isPending } = authClient.useSession()
+
+  const handleLogout = async () => {
+    await authClient.signOut()
+    setOpen(false)
+    router.push("/login")
+  }
 
   const navLinks = [
     { href: "/", label: "Today" },
@@ -74,13 +84,22 @@ export function MainNav() {
                     </Link>
                   ))}
                   <div className="h-px bg-border my-2 mr-6" />
-                  <Link
-                    href="/login"
-                    onClick={() => setOpen(false)}
-                    className="text-foreground/60 hover:text-foreground transition-colors font-medium"
-                  >
-                    Login / Register
-                  </Link>
+                  {!isPending && session ? (
+                    <button
+                      onClick={handleLogout}
+                      className="text-left text-foreground/60 hover:text-foreground transition-colors font-medium flex items-center"
+                    >
+                      <LogOut className="mr-2 h-4 w-4" /> Logout
+                    </button>
+                  ) : (
+                    <Link
+                      href="/login"
+                      onClick={() => setOpen(false)}
+                      className="text-foreground/60 hover:text-foreground transition-colors font-medium"
+                    >
+                      Login / Register
+                    </Link>
+                  )}
                 </div>
               </SheetContent>
             </Sheet>
@@ -88,9 +107,15 @@ export function MainNav() {
           </div>
           <nav className="flex items-center space-x-2">
             <ThemeToggle />
-            <Link href="/login" className="hidden md:inline-flex text-sm font-medium hover:underline px-2 py-1">
-              Login
-            </Link>
+            {!isPending && session ? (
+              <Button variant="ghost" size="sm" onClick={handleLogout} className="hidden md:inline-flex">
+                Logout
+              </Button>
+            ) : (
+              <Link href="/login" className="hidden md:inline-flex text-sm font-medium hover:underline px-2 py-1">
+                Login
+              </Link>
+            )}
           </nav>
         </div>
       </div>

@@ -1,3 +1,8 @@
+"use client"
+
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { authClient } from "@/lib/auth-client"
 import Link from "next/link"
 import { UserPlus } from "lucide-react"
 
@@ -7,6 +12,32 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
 export default function RegisterPage() {
+  const router = useRouter()
+  const [name, setName] = useState("")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError("")
+    
+    const { data, error } = await authClient.signUp.email({
+      email,
+      password,
+      name,
+    })
+    
+    if (error) {
+      setError(error.message || "Failed to register")
+      setLoading(false)
+    } else {
+      router.push("/")
+    }
+  }
+
   return (
     <div className="container flex items-center justify-center min-h-[80vh] py-10 px-4">
       <Card className="w-full max-w-md shadow-xl border rounded-3xl overflow-hidden">
@@ -17,21 +48,24 @@ export default function RegisterPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
-            <Input id="name" type="text" placeholder="John Doe" required />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" placeholder="m@example.com" required />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input id="password" type="password" required />
-          </div>
-          <Button className="w-full" type="submit">
-            <UserPlus className="mr-2 h-4 w-4" /> Sign Up
-          </Button>
+          {error && <div className="text-sm text-center text-destructive">{error}</div>}
+          <form onSubmit={handleRegister} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Name</Label>
+              <Input id="name" type="text" placeholder="John Doe" required value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" type="email" placeholder="m@example.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+            </div>
+            <Button className="w-full" type="submit" disabled={loading}>
+              {loading ? "Creating account..." : <><UserPlus className="mr-2 h-4 w-4" /> Sign Up</>}
+            </Button>
+          </form>
           
           <div className="relative">
             <div className="absolute inset-0 flex items-center">

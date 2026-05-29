@@ -1,130 +1,103 @@
 "use client"
 
-import { useState } from "react"
-import { Calendar, BarChart3, JapaneseYen } from "lucide-react"
+import { useState, useEffect } from "react"
+import { format } from "date-fns"
+import { BarChart3 } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Label } from "@/components/ui/label"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { authClient } from "@/lib/auth-client"
+import { getYearlySummary } from "@/app/actions"
 
-const MOCK_YEARS = ["2024", "2023"]
-
-const MOCK_MONTHLY_DATA = [
-  { month: "January", totalMins: 9600, salary: 178400 },
-  { month: "February", totalMins: 10080, salary: 187320 },
-  { month: "March", totalMins: 10560, salary: 196240 },
-  { month: "April", totalMins: 8400, salary: 156100 },
-]
-
-export default function YearlyAccumulationPage() {
-  const [year, setYear] = useState(MOCK_YEARS[0])
-
-  const yearlyTotalMins = MOCK_MONTHLY_DATA.reduce((acc, curr) => acc + curr.totalMins, 0)
-  const yearlyTotalSalary = MOCK_MONTHLY_DATA.reduce((acc, curr) => acc + curr.salary, 0)
+export default function YearlyPage() {
+  const router = useRouter()
+  const { data: session, isPending } = authClient.useSession()
   
-  const totalHours = Math.floor(yearlyTotalMins / 60)
-  const totalMins = yearlyTotalMins % 60
+  const currentYear = new Date().getFullYear().toString()
+  const [selectedYear, setSelectedYear] = useState(currentYear)
+  const [summary, setSummary] = useState({ totalWorkMinutes: 0, totalWorkDays: 0, totalSalaryYen: 0 })
 
-  const handleYearChange = (val: string | null) => {
-    if (val) setYear(val)
-  }
+  useEffect(() => {
+    if (!isPending && !session) {
+      router.push("/login")
+    }
+  }, [session, isPending, router])
+
+  const years = Array.from({ length: 5 }).map((_, i) => (Number(currentYear) - i).toString())
+
+  useEffect(() => {
+    async function load() {
+      if (!session) return
+      const data = await getYearlySummary(selectedYear)
+      setSummary(data)
+    }
+    load()
+  }, [session, selectedYear])
+
+  if (isPending || !session) return null
+
+  const hours = Math.floor(summary.totalWorkMinutes / 60)
+  const minutes = summary.totalWorkMinutes % 60
 
   return (
     <div className="container max-w-4xl mx-auto py-10 px-4">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Yearly Accumulation</h1>
-        <p className="text-muted-foreground mt-2">
-          View your total earnings and work hours accumulated over the year.
-        </p>
+      <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Yearly Accumulation</h1>
+          <p className="text-muted-foreground mt-2">
+            Track your total work hours and earnings over the year.
+          </p>
+        </div>
+        <div className="w-32">
+          <Select value={selectedYear} onValueChange={(val) => val && setSelectedYear(val)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select year" />
+            </SelectTrigger>
+            <SelectContent>
+              {years.map((y) => (
+                <SelectItem key={y} value={y}>{y}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3 mb-6">
-        <Card className="md:col-span-1 rounded-2xl border shadow-sm">
-          <CardHeader>
-            <CardTitle>Select Year</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <Label>Year</Label>
-              <Select value={year} onValueChange={handleYearChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select year" />
-                </SelectTrigger>
-                <SelectContent>
-                  {MOCK_YEARS.map((y) => (
-                    <SelectItem key={y} value={y}>{y}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="md:col-span-2 bg-primary/5 border-primary/20 rounded-2xl border shadow-sm">
-          <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 md:divide-x divide-y md:divide-y-0 gap-y-6 md:gap-y-0 h-full items-center">
-            <div className="flex flex-col items-center justify-center text-center space-y-2 px-4">
-              <div className="p-3 bg-primary/10 rounded-full">
-                <JapaneseYen className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Salary ({year})</p>
-                <p className="text-3xl font-bold text-primary">
-                  ¥{yearlyTotalSalary.toLocaleString()}
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-col items-center justify-center text-center space-y-2 px-4">
-              <div className="p-3 bg-muted rounded-full">
-                <BarChart3 className="w-5 h-5 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Hours</p>
-                <p className="text-3xl font-bold">
-                  {totalHours}h {totalMins}m
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="rounded-2xl border shadow-sm overflow-hidden">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-primary" />
-            Monthly Breakdown
+      <Card className="rounded-2xl border-none bg-gradient-to-br from-primary/10 via-primary/5 to-background shadow-md overflow-hidden">
+        <CardHeader className="pb-8 pt-8 px-8">
+          <CardTitle className="flex items-center gap-2 text-2xl">
+            <BarChart3 className="w-6 h-6 text-primary" />
+            {selectedYear} Summary
           </CardTitle>
-          <CardDescription>A summary of your earnings per month for {year}.</CardDescription>
+          <CardDescription className="text-base">
+            Total accumulation from January 1st to December 31st, {selectedYear}.
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Month</TableHead>
-                <TableHead className="text-right">Work Hours</TableHead>
-                <TableHead className="text-right">Salary</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {MOCK_MONTHLY_DATA.map((data, index) => {
-                const hours = Math.floor(data.totalMins / 60)
-                const mins = data.totalMins % 60
-                
-                return (
-                  <TableRow key={index}>
-                    <TableCell className="font-medium">{data.month}</TableCell>
-                    <TableCell className="text-right">
-                      {hours}h {mins}m
-                    </TableCell>
-                    <TableCell className="text-right font-medium text-primary">
-                      ¥{data.salary.toLocaleString()}
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
+        <CardContent className="px-8 pb-10 space-y-10">
+          
+          <div className="grid sm:grid-cols-2 gap-8">
+            <div className="space-y-3">
+              <div className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total Work Time</div>
+              <div className="text-5xl font-bold flex items-baseline gap-1">
+                {hours}<span className="text-xl font-semibold text-muted-foreground">h</span> {minutes}<span className="text-xl font-semibold text-muted-foreground">m</span>
+              </div>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total Days Worked</div>
+              <div className="text-5xl font-bold flex items-baseline gap-1">
+                {summary.totalWorkDays} <span className="text-xl font-semibold text-muted-foreground">days</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="space-y-3 pt-6 border-t border-primary/20">
+            <div className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total Salary Earned</div>
+            <div className="text-6xl font-black text-primary drop-shadow-sm">
+              ¥{summary.totalSalaryYen.toLocaleString()}
+            </div>
+          </div>
+
         </CardContent>
       </Card>
     </div>

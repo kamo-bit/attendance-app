@@ -2,43 +2,94 @@
 
 import { useState, useEffect } from "react"
 import { format, parseISO, isValid } from "date-fns"
-import { Clock, Calculator, JapaneseYen, LogIn, LogOut, Coffee } from "lucide-react"
+import { Calendar as CalendarIcon, Clock, Coffee, CheckCircle2 } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Button } from "@/components/ui/button"
-import { Switch } from "@/components/ui/switch"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Switch } from "@/components/ui/switch"
+import { Button } from "@/components/ui/button"
+import { authClient } from "@/lib/auth-client"
+import { getSalarySettings, updateSalarySettings, saveAttendance, getTodayAttendance } from "@/app/actions"
+import { getPayrollPeriod } from "@/lib/utils"
 
 export default function Home() {
-  const [attendanceDate, setAttendanceDate] = useState<string>("")
+  const router = useRouter()
+  const { data: session, isPending } = authClient.useSession()
+  
+  const [attendanceDate, setAttendanceDate] = useState("")
   const [clockIn, setClockIn] = useState("")
-  const [clockOut, setClockOut] = useState("")
   const [hasBreak, setHasBreak] = useState(false)
   const [breakCount, setBreakCount] = useState<"1" | "2">("1")
-  
   const [break1From, setBreak1From] = useState("")
   const [break1To, setBreak1To] = useState("")
   const [break2From, setBreak2From] = useState("")
   const [break2To, setBreak2To] = useState("")
-
-  const [workMinutes, setWorkMinutes] = useState(0)
+  const [clockOut, setClockOut] = useState("")
   
-  const HOURLY_WAGE = 1115
+  const [workMinutes, setWorkMinutes] = useState(0)
+  const [hourlyWage, setHourlyWage] = useState(1115)
+  const [isSaving, setIsSaving] = useState(false)
+
+  useEffect(() => {
+    if (!isPending && !session) {
+      router.push("/login")
+    }
+  }, [session, isPending, router])
+
+  useEffect(() => {
+    const today = format(new Date(), "yyyy-MM-dd")
+    setAttendanceDate(today)
+  }, [])
+
+  useEffect(() => {
+    async function loadInitialData() {
+      if (!session || !attendanceDate) return
+      
+      try {
+        const settings = await getSalarySettings()
+        if (settings) {
+          setHourlyWage(settings.hourlyWageYen)
+        }
+
+        const todayRecord = await getTodayAttendance(attendanceDate)
+        if (todayRecord) {
+          setClockIn(todayRecord.clockIn || "")
+          setHasBreak(todayRecord.hasBreak)
+          setBreakCount(todayRecord.breakCount === 2 ? "2" : "1")
+          setBreak1From(todayRecord.break1From || "")
+          setBreak1To(todayRecord.break1To || "")
+          setBreak2From(todayRecord.break2From || "")
+          setBreak2To(todayRecord.break2To || "")
+          setClockOut(todayRecord.clockOut || "")
+          setWorkMinutes(todayRecord.workMinutes)
+        } else {
+          // Reset fields for new date
+          setClockIn("")
+          setHasBreak(false)
+          setBreak1From("")
+          setBreak1To("")
+          setBreak2From("")
+          setBreak2To("")
+          setClockOut("")
+          setWorkMinutes(0)
+        }
+      } catch (e) {
+        console.error(e)
+      }
+    }
+    
+    loadInitialData()
+  }, [session, attendanceDate])
   
   const calculateMinutes = (start: string, end: string) => {
     if (!start || !end) return 0
-    const [h1, m1] = start.split(':').map(Number)
-    const [h2, m2] = end.split(':').map(Number)
-    let diff = (h2 * 60 + m2) - (h1 * 60 + m1)
-    if (diff < 0) diff += 24 * 60
-    return Math.max(0, diff)
+    const [h1, m1] = start.split(":").map(Number)
+    const [h2, m2] = end.split(":").map(Number)
+    return (h2 * 60 + m2) - (h1 * 60 + m1)
   }
-
-  useEffect(() => {
-    setAttendanceDate(format(new Date(), "yyyy-MM-dd"))
-  }, [])
 
   useEffect(() => {
     let total = 0
@@ -46,10 +97,10 @@ export default function Home() {
       total = calculateMinutes(clockIn, clockOut)
       
       if (hasBreak) {
-        if (breakCount === "1" || breakCount === "2") {
+        if (break1From && break1To) {
           total -= calculateMinutes(break1From, break1To)
         }
-        if (breakCount === "2") {
+        if (breakCount === "2" && break2From && break2To) {
           total -= calculateMinutes(break2From, break2To)
         }
       }
@@ -57,167 +108,229 @@ export default function Home() {
     setWorkMinutes(Math.max(0, total))
   }, [clockIn, clockOut, hasBreak, breakCount, break1From, break1To, break2From, break2To])
 
+  const handleSaveWage = async (wage: number) => {
+    setHourlyWage(wage)
+    await updateSalarySettings(wage)
+  }
+
+  const handleSaveAttendance = async () => {
+    if (!attendanceDate || !clockIn) return
+    setIsSaving(true)
+    
+    try {
+      const estimatedSalaryYen = Math.floor((workMinutes / 60) * hourlyWage)
+      const period = getPayrollPeriod(attendanceDate)
+      
+      await saveAttendance({
+        attendanceDate,
+        clockIn,
+        hasBreak,
+        breakCount: hasBreak ? Number(breakCount) : 0,
+        break1From: hasBreak ? break1From : null,
+        break1To: hasBreak ? break1To : null,
+        break2From: hasBreak && breakCount === "2" ? break2From : null,
+        break2To: hasBreak && breakCount === "2" ? break2To : null,
+        clockOut,
+        workMinutes,
+        hourlyWageYen: hourlyWage,
+        estimatedSalaryYen,
+        payrollPeriodStart: period.start,
+        payrollPeriodEnd: period.end,
+        status: clockOut ? "completed" : "draft"
+      })
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   const hours = Math.floor(workMinutes / 60)
   const minutes = workMinutes % 60
-  const estimatedSalary = Math.floor((workMinutes / 60) * HOURLY_WAGE)
+  const estimatedSalary = Math.floor((workMinutes / 60) * hourlyWage)
   
   const parsedDate = attendanceDate ? parseISO(attendanceDate) : new Date()
   const displayDate = isValid(parsedDate) ? parsedDate : new Date()
 
+  if (isPending) return null
+  if (!session) return null
+
   return (
-    <div className="container max-w-2xl mx-auto py-10 px-4">
-      <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Daily Attendance</h1>
-          <p className="text-muted-foreground mt-2">
-            {format(displayDate, "EEEE, MMMM do, yyyy")}
-          </p>
-        </div>
-        <div className="w-full md:w-auto space-y-1">
-          <Label htmlFor="attendance-date" className="text-xs text-muted-foreground">Record Date</Label>
-          <Input 
-            id="attendance-date" 
-            type="date" 
-            value={attendanceDate} 
-            onChange={(e) => setAttendanceDate(e.target.value)}
-            className="w-full md:w-auto"
-          />
-        </div>
+    <div className="container max-w-4xl mx-auto py-10 px-4">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold tracking-tight">Today&apos;s Attendance</h1>
+        <p className="text-muted-foreground mt-2">
+          Log your work hours and track your estimated earnings.
+        </p>
       </div>
 
-      <Card className="border shadow-sm rounded-2xl overflow-hidden">
-        <CardHeader className="bg-muted/30 border-b">
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="w-5 h-5 text-primary" />
-            Time Record
-          </CardTitle>
-          <CardDescription>Enter your working hours and break times for today.</CardDescription>
-        </CardHeader>
-        <CardContent className="pt-6 space-y-8">
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-3">
-              <Label htmlFor="clock-in" className="flex items-center gap-2 font-medium">
-                <LogIn className="w-4 h-4" />
-                Clock In
-              </Label>
-              <Input 
-                id="clock-in" 
-                type="time" 
-                value={clockIn} 
-                onChange={(e) => setClockIn(e.target.value)}
-                className="w-full text-lg p-4 h-12"
-              />
-            </div>
-            <div className="space-y-3">
-              <Label htmlFor="clock-out" className="flex items-center gap-2 font-medium">
-                <LogOut className="w-4 h-4" />
-                Clock Out
-              </Label>
-              <Input 
-                id="clock-out" 
-                type="time" 
-                value={clockOut} 
-                onChange={(e) => setClockOut(e.target.value)}
-                className="w-full text-lg p-4 h-12"
-              />
-            </div>
-          </div>
-
-          <div className="p-4 rounded-lg bg-muted/40 border space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-base flex items-center gap-2">
-                  <Coffee className="w-4 h-4" />
-                  Take a break?
-                </Label>
-                <p className="text-sm text-muted-foreground">Toggle if you had any breaks today.</p>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {/* Input Form Column */}
+        <div className="lg:col-span-2 space-y-6">
+          <Card className="rounded-2xl shadow-sm border overflow-hidden transition-all duration-300 hover:shadow-md">
+            <CardHeader className="bg-primary/5 pb-8 pt-8">
+              <div className="flex justify-between items-center">
+                <CardTitle className="flex items-center gap-2">
+                  <CalendarIcon className="w-5 h-5 text-primary" />
+                  Clock In / Out
+                </CardTitle>
+                <div className="text-sm font-medium bg-background px-3 py-1 rounded-full border shadow-sm">
+                  {format(displayDate, "EEEE, MMM d, yyyy")}
+                </div>
               </div>
-              <Switch checked={hasBreak} onCheckedChange={setHasBreak} />
-            </div>
+              <CardDescription className="pt-2">
+                Record your daily attendance time.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-8 pt-6">
+              
+              {/* Date Input */}
+              <div className="space-y-3">
+                <Label htmlFor="date-input" className="text-base font-semibold">Log Date</Label>
+                <div className="flex items-center space-x-2">
+                  <Input 
+                    id="date-input"
+                    type="date"
+                    value={attendanceDate}
+                    onChange={(e) => setAttendanceDate(e.target.value)}
+                    className="max-w-[200px]"
+                  />
+                  <span className="text-sm text-muted-foreground ml-2">You can log past dates here.</span>
+                </div>
+              </div>
 
-            {hasBreak && (
-              <div className="pt-4 border-t space-y-6 animate-in fade-in slide-in-from-top-4">
+              {/* Time Inputs */}
+              <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-3">
-                  <Label>How many breaks?</Label>
-                  <RadioGroup 
-                    value={breakCount} 
-                    onValueChange={(v) => setBreakCount(v as "1" | "2")}
-                    className="flex gap-4"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="1" id="break-1" />
-                      <Label htmlFor="break-1">1 Break</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="2" id="break-2" />
-                      <Label htmlFor="break-2">2 Breaks</Label>
-                    </div>
-                  </RadioGroup>
+                  <Label htmlFor="in" className="text-base font-semibold flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-emerald-500" /> Time In
+                  </Label>
+                  <Input 
+                    id="in" 
+                    type="time" 
+                    value={clockIn}
+                    onChange={(e) => setClockIn(e.target.value)}
+                    className="h-12 text-lg"
+                  />
+                </div>
+                <div className="space-y-3">
+                  <Label htmlFor="out" className="text-base font-semibold flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-rose-500" /> Time Out
+                  </Label>
+                  <Input 
+                    id="out" 
+                    type="time" 
+                    value={clockOut}
+                    onChange={(e) => setClockOut(e.target.value)}
+                    className="h-12 text-lg"
+                  />
+                </div>
+              </div>
+
+              {/* Breaks Section */}
+              <div className="rounded-xl border bg-card p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="space-y-1">
+                    <Label htmlFor="break-switch" className="text-base font-semibold flex items-center gap-2">
+                      <Coffee className="w-4 h-4 text-amber-500" /> Take a break?
+                    </Label>
+                    <p className="text-sm text-muted-foreground">Toggle if you had resting periods.</p>
+                  </div>
+                  <Switch 
+                    id="break-switch" 
+                    checked={hasBreak}
+                    onCheckedChange={setHasBreak}
+                  />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">Break 1 Start</Label>
-                    <Input type="time" value={break1From} onChange={(e) => setBreak1From(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">Break 1 End</Label>
-                    <Input type="time" value={break1To} onChange={(e) => setBreak1To(e.target.value)} />
-                  </div>
-                </div>
+                {hasBreak && (
+                  <div className="space-y-6 pt-4 border-t animate-in fade-in slide-in-from-top-4 duration-300">
+                    <RadioGroup 
+                      value={breakCount} 
+                      onValueChange={(val) => setBreakCount(val as "1" | "2")}
+                      className="flex space-x-4"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="1" id="r1" />
+                        <Label htmlFor="r1">1 Break</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="2" id="r2" />
+                        <Label htmlFor="r2">2 Breaks</Label>
+                      </div>
+                    </RadioGroup>
 
-                {breakCount === "2" && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end animate-in fade-in">
-                    <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground">Break 2 Start</Label>
-                      <Input type="time" value={break2From} onChange={(e) => setBreak2From(e.target.value)} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground">Break 2 End</Label>
-                      <Input type="time" value={break2To} onChange={(e) => setBreak2To(e.target.value)} />
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4 items-center bg-muted/50 p-4 rounded-lg">
+                        <div className="text-sm font-medium">Break 1</div>
+                        <div className="flex items-center space-x-2">
+                          <Input type="time" value={break1From} onChange={(e) => setBreak1From(e.target.value)} className="h-9" />
+                          <span className="text-muted-foreground">to</span>
+                          <Input type="time" value={break1To} onChange={(e) => setBreak1To(e.target.value)} className="h-9" />
+                        </div>
+                      </div>
+                      
+                      {breakCount === "2" && (
+                        <div className="grid grid-cols-2 gap-4 items-center bg-muted/50 p-4 rounded-lg animate-in fade-in zoom-in duration-300">
+                          <div className="text-sm font-medium">Break 2</div>
+                          <div className="flex items-center space-x-2">
+                            <Input type="time" value={break2From} onChange={(e) => setBreak2From(e.target.value)} className="h-9" />
+                            <span className="text-muted-foreground">to</span>
+                            <Input type="time" value={break2To} onChange={(e) => setBreak2To(e.target.value)} className="h-9" />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
               </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+            <CardFooter className="bg-muted/30 pt-6">
+              <Button 
+                onClick={handleSaveAttendance} 
+                className="w-full h-12 text-lg rounded-xl"
+                disabled={!clockIn || isSaving}
+              >
+                {isSaving ? "Saving..." : "Save Record"}
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
 
-      <Card className="mt-6 border-none shadow-lg rounded-2xl bg-gradient-to-br from-card to-primary/5">
-        <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:divide-x divide-y md:divide-y-0">
-            <div className="space-y-2 pb-6 md:pb-0">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Calculator className="w-4 h-4" />
-                <span className="font-medium">Total Work Time</span>
+        {/* Summary Column */}
+        <div className="space-y-6">
+          <Card className="rounded-2xl border-none bg-gradient-to-br from-primary/10 via-primary/5 to-background shadow-md">
+            <CardHeader>
+              <CardTitle>Daily Summary</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-8">
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total Work Time</div>
+                <div className="text-4xl font-bold flex items-baseline gap-1">
+                  {hours}<span className="text-xl font-semibold text-muted-foreground">h</span> {minutes}<span className="text-xl font-semibold text-muted-foreground">m</span>
+                </div>
               </div>
-              <div className="text-3xl font-bold">
-                {hours}<span className="text-lg text-muted-foreground font-normal mx-1">h</span>
-                {minutes}<span className="text-lg text-muted-foreground font-normal ml-1">m</span>
+              
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Estimated Salary</div>
+                <div className="text-3xl font-bold text-primary">
+                  ¥{estimatedSalary.toLocaleString()}
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <Label htmlFor="wage-input" className="text-xs text-muted-foreground whitespace-nowrap">Wage (¥/hr):</Label>
+                  <Input 
+                    id="wage-input"
+                    type="number"
+                    value={hourlyWage || ""}
+                    onChange={(e) => handleSaveWage(Number(e.target.value))}
+                    className="h-7 w-24 px-2 py-1 text-xs bg-background/50"
+                  />
+                </div>
               </div>
-            </div>
-            
-            <div className="space-y-2 pt-6 md:pt-0 md:pl-6">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <JapaneseYen className="w-4 h-4" />
-                <span className="font-medium">Estimated Salary</span>
-              </div>
-              <div className="text-3xl font-bold text-primary">
-                ¥{estimatedSalary.toLocaleString()}
-              </div>
-              <p className="text-xs text-muted-foreground">Based on ¥{HOURLY_WAGE}/hr</p>
-            </div>
-          </div>
-        </CardContent>
-        <CardFooter className="bg-muted/30 border-t p-4 px-6 flex justify-end">
-          <Button size="lg" className="w-full sm:w-auto font-semibold">
-            Save Record
-          </Button>
-        </CardFooter>
-      </Card>
-
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   )
 }
