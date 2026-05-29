@@ -150,4 +150,4 @@ export async function getYearlySummary(year: string) {
     totalWorkDays: records.filter(r => r.clockIn).length,
     totalSalaryYen: totalSalary,
   }
-
+}
