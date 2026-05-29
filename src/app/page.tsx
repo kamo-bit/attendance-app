@@ -288,20 +288,20 @@ export default function Home() {
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-4 items-center bg-muted/50 p-4 rounded-lg">
                         <div className="text-sm font-medium">Break 1</div>
-                        <div className="flex items-center space-x-2">
-                          <Input type="time" value={break1From} onChange={(e) => setBreak1From(e.target.value)} className="h-9" />
-                          <span className="text-muted-foreground">to</span>
-                          <Input type="time" value={break1To} onChange={(e) => setBreak1To(e.target.value)} className="h-9" />
+                        <div className="flex items-center space-x-2 w-full">
+                          <Input type="time" value={break1From} onChange={(e) => setBreak1From(e.target.value)} className="h-9 flex-1 w-full" />
+                          <span className="text-muted-foreground shrink-0">to</span>
+                          <Input type="time" value={break1To} onChange={(e) => setBreak1To(e.target.value)} className="h-9 flex-1 w-full" />
                         </div>
                       </div>
                       
                       {breakCount === "2" && (
                         <div className="grid grid-cols-2 gap-4 items-center bg-muted/50 p-4 rounded-lg animate-in fade-in zoom-in duration-300">
                           <div className="text-sm font-medium">Break 2</div>
-                          <div className="flex items-center space-x-2">
-                            <Input type="time" value={break2From} onChange={(e) => setBreak2From(e.target.value)} className="h-9" />
-                            <span className="text-muted-foreground">to</span>
-                            <Input type="time" value={break2To} onChange={(e) => setBreak2To(e.target.value)} className="h-9" />
+                          <div className="flex items-center space-x-2 w-full">
+                            <Input type="time" value={break2From} onChange={(e) => setBreak2From(e.target.value)} className="h-9 flex-1 w-full" />
+                            <span className="text-muted-foreground shrink-0">to</span>
+                            <Input type="time" value={break2To} onChange={(e) => setBreak2To(e.target.value)} className="h-9 flex-1 w-full" />
                           </div>
                         </div>
                       )}

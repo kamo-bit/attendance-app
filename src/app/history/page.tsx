@@ -326,15 +326,15 @@ export default function HistoryPage() {
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-2 items-center bg-muted/50 p-3 rounded-lg">
                       <div className="text-sm font-medium col-span-2">Break 1</div>
-                      <Input type="time" value={editBreak1From} onChange={(e) => setEditBreak1From(e.target.value)} className="h-9" />
-                      <Input type="time" value={editBreak1To} onChange={(e) => setEditBreak1To(e.target.value)} className="h-9" />
+                      <Input type="time" value={editBreak1From} onChange={(e) => setEditBreak1From(e.target.value)} className="h-9 w-full" />
+                      <Input type="time" value={editBreak1To} onChange={(e) => setEditBreak1To(e.target.value)} className="h-9 w-full" />
                     </div>
                     
                     {editBreakCount === "2" && (
                       <div className="grid grid-cols-2 gap-2 items-center bg-muted/50 p-3 rounded-lg">
                         <div className="text-sm font-medium col-span-2">Break 2</div>
-                        <Input type="time" value={editBreak2From} onChange={(e) => setEditBreak2From(e.target.value)} className="h-9" />
-                        <Input type="time" value={editBreak2To} onChange={(e) => setEditBreak2To(e.target.value)} className="h-9" />
+                        <Input type="time" value={editBreak2From} onChange={(e) => setEditBreak2From(e.target.value)} className="h-9 w-full" />
+                        <Input type="time" value={editBreak2To} onChange={(e) => setEditBreak2To(e.target.value)} className="h-9 w-full" />
                       </div>
                     )}
                   </div>
