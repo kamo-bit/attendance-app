@@ -23,10 +23,14 @@ export default function ResetPasswordPage() {
     setStatus("loading")
     setErrorMsg("")
     
-    // authClient automatically reads the token from the URL query params
+    // Extract token from URL
+    const searchParams = new URLSearchParams(window.location.search);
+    const token = searchParams.get("token") || "";
+
     const { error } = await authClient.resetPassword({
       newPassword: password,
-    })
+      token: token || undefined,
+    } as any)
     
     if (error) {
       setStatus("error")

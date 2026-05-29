@@ -62,7 +62,12 @@ export default function ForgotPasswordPage() {
                   Click Here to Reset Password
                 </Button>
               ) : (
-                <div className="animate-pulse text-sm">Generating link...</div>
+                <div className="mt-4 p-4 bg-muted rounded-md text-sm text-left">
+                  <p className="font-semibold mb-2">Notice (Vercel / Production):</p>
+                  <p>
+                    Because this app doesn't have an email provider configured yet, you need to check your <strong>Vercel Runtime Logs</strong> to get the reset link.
+                  </p>
+                </div>
               )}
             </div>
           ) : (
