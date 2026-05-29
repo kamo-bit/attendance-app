@@ -13,7 +13,7 @@ import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
 import { authClient } from "@/lib/auth-client"
 import { getSalarySettings, updateSalarySettings, saveAttendance, getTodayAttendance } from "@/app/actions"
-import { getPayrollPeriod } from "@/lib/utils"
+import { getPayrollPeriod, validateAttendanceInput } from "@/lib/utils"
 import { toast } from "sonner"
 
 export default function Home() {
@@ -33,6 +33,9 @@ export default function Home() {
   const [workMinutes, setWorkMinutes] = useState(0)
   const [hourlyWage, setHourlyWage] = useState(1115)
   const [isSaving, setIsSaving] = useState(false)
+  
+  // Track if the record for this date is already completed
+  const [isCompletedRecord, setIsCompletedRecord] = useState(false)
 
   useEffect(() => {
     if (!isPending && !session) {
@@ -66,6 +69,7 @@ export default function Home() {
           setBreak2To(todayRecord.break2To || "")
           setClockOut(todayRecord.clockOut || "")
           setWorkMinutes(todayRecord.workMinutes)
+          setIsCompletedRecord(todayRecord.status === "completed")
         } else {
           // Reset fields for new date
           setClockIn("")
@@ -76,6 +80,7 @@ export default function Home() {
           setBreak2To("")
           setClockOut("")
           setWorkMinutes(0)
+          setIsCompletedRecord(false)
         }
       } catch (e) {
         console.error(e)
@@ -117,6 +122,22 @@ export default function Home() {
 
   const handleSaveAttendance = async () => {
     if (!attendanceDate || !clockIn) return
+    
+    if (isCompletedRecord) {
+      toast.error("Attendance for this date is already completed. Please edit it from the History page.")
+      return
+    }
+
+    const validationError = validateAttendanceInput({
+      clockIn, clockOut, hasBreak, breakCount: hasBreak ? (breakCount as any) : 0, 
+      break1From, break1To, break2From, break2To
+    })
+
+    if (validationError) {
+      toast.error(validationError)
+      return
+    }
+
     setIsSaving(true)
     
     try {
@@ -288,12 +309,22 @@ export default function Home() {
                   </div>
                 )}
               </div>
+
+              {isCompletedRecord && (
+                <div className="bg-amber-500/10 text-amber-600 border border-amber-500/20 p-4 rounded-xl text-sm flex items-start gap-2">
+                  <div className="mt-0.5">⚠️</div>
+                  <div>
+                    <strong>Record Completed</strong>
+                    <p>Attendance for this date has already been completed. To make changes, please use the Edit function on the History page.</p>
+                  </div>
+                </div>
+              )}
             </CardContent>
             <CardFooter className="bg-muted/30 pt-6">
               <Button 
                 onClick={handleSaveAttendance} 
                 className="w-full h-12 text-lg rounded-xl"
-                disabled={!clockIn || isSaving}
+                disabled={!clockIn || isSaving || isCompletedRecord}
               >
                 {isSaving ? "Saving..." : "Save Record"}
               </Button>

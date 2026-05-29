@@ -86,10 +86,10 @@ export async function deleteAttendance(id: string) {
   revalidatePath('/history')
 }
 
-export async function updateAttendance(id: string, clockIn: string, clockOut: string, salary: number) {
+export async function updateAttendance(id: string, data: any) {
   const user = await getSession()
   await db.update(attendanceRecords)
-    .set({ clockIn, clockOut, estimatedSalaryYen: salary, updatedAt: new Date() })
+    .set({ ...data, updatedAt: new Date() })
     .where(
       and(
         eq(attendanceRecords.id, id),
