@@ -38,6 +38,7 @@ export default function LoginPage() {
     const { error: authError } = await authClient.signIn.email({
       email,
       password,
+      rememberMe: true,
     })
     
     if (authError) {

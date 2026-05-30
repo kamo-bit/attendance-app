@@ -15,6 +15,14 @@ export const auth = betterAuth({
     logger: {
         level: "debug"
     },
+    session: {
+        expiresIn: 60 * 60 * 24 * 365, // 1 year session expiration
+        updateAge: 60 * 60 * 24, // 1 day update age
+        cookieCache: {
+            enabled: true,
+            maxAge: 5 * 60 // 5 minutes cookie cache
+        }
+    },
     database: drizzleAdapter(db, {
         provider: "sqlite",
         schema: {
