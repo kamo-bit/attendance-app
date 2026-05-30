@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Menu, LogOut } from "lucide-react"
+import { Menu, LogOut, User } from "lucide-react"
 
 import { authClient } from "@/lib/auth-client"
 
@@ -84,12 +84,25 @@ export function MainNav() {
                   ))}
                   <div className="h-px bg-border my-2 mr-6" />
                   {!isPending && session ? (
-                    <button
-                      onClick={handleLogout}
-                      className="text-left text-foreground/60 hover:text-foreground transition-colors font-medium flex items-center"
-                    >
-                      <LogOut className="mr-2 h-4 w-4" /> Logout
-                    </button>
+                    <>
+                      <div className="flex items-center gap-3 py-2 mr-6">
+                        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                          <span className="text-sm font-bold text-primary">
+                            {session.user?.name?.charAt(0)?.toUpperCase() || session.user?.email?.charAt(0)?.toUpperCase() || "U"}
+                          </span>
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-sm font-semibold truncate">{session.user?.name || "User"}</span>
+                          <span className="text-xs text-muted-foreground truncate">{session.user?.email}</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleLogout}
+                        className="text-left text-foreground/60 hover:text-foreground transition-colors font-medium flex items-center"
+                      >
+                        <LogOut className="mr-2 h-4 w-4" /> Logout
+                      </button>
+                    </>
                   ) : (
                     <Link
                       href="/login"
@@ -107,9 +120,19 @@ export function MainNav() {
           <nav className="flex items-center space-x-2">
             <ThemeToggle />
             {!isPending && session ? (
-              <Button variant="ghost" size="sm" onClick={handleLogout} className="hidden md:inline-flex">
-                Logout
-              </Button>
+              <div className="hidden md:flex items-center gap-2">
+                <div className="flex items-center gap-2 px-2 py-1 rounded-lg bg-muted/50 border">
+                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
+                    <span className="text-xs font-bold text-primary">
+                      {session.user?.name?.charAt(0)?.toUpperCase() || session.user?.email?.charAt(0)?.toUpperCase() || "U"}
+                    </span>
+                  </div>
+                  <span className="text-sm font-medium max-w-[120px] truncate">{session.user?.name || session.user?.email}</span>
+                </div>
+                <Button variant="ghost" size="sm" onClick={handleLogout}>
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </div>
             ) : (
               <Link href="/login" className="hidden md:inline-flex text-sm font-medium hover:underline px-2 py-1">
                 Login
