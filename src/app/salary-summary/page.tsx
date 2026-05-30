@@ -1,14 +1,15 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { format, parseISO, subMonths, addMonths, eachDayOfInterval, startOfWeek, endOfWeek, isSameMonth } from "date-fns"
-import { FileText, CalendarRange, BarChart3, CalendarDays, MousePointerClick, Banknote, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react"
+import { FileText, CalendarRange, BarChart3, CalendarDays, MousePointerClick, Banknote, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Download } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { authClient } from "@/lib/auth-client"
@@ -40,6 +41,8 @@ export default function SalarySummaryPage() {
 
   const [isMobile, setIsMobile] = useState(false)
   const [calendarMonth, setCalendarMonth] = useState<Date | null>(null)
+  const [isExporting, setIsExporting] = useState(false)
+  const chartRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     setIsMobile(window.innerWidth < 768)
@@ -97,15 +100,15 @@ export default function SalarySummaryPage() {
   const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 })
   const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd })
 
-  // Chart data for monthly (Daily Salary) - Full month based on calendar selector
-  const allDaysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd })
-  const monthlyChartData = allDaysInMonth.map(day => {
+  // Chart data for monthly (Daily Salary) - Based on the precise payroll period
+  const allDaysInPeriod = eachDayOfInterval({ start: pStart, end: pEnd })
+  const monthlyChartData = allDaysInPeriod.map(day => {
     const dateStr = format(day, "yyyy-MM-dd")
     // Find record in the active period first, then fallback to yearly summary records
     const record = summary.records?.find(r => r.attendanceDate === dateStr) ||
                    yearlySummary.records?.find(r => r.attendanceDate === dateStr)
     return {
-      date: format(day, "d"), // Just the day number (1, 2, 3...)
+      date: format(day, "d/M"), // e.g. '21/3', '1/4' to prevent overlapping text
       fullDate: format(day, "MMMM d, yyyy"),
       salary: record ? record.estimatedSalaryYen : 0,
       day: dateStr
@@ -155,6 +158,196 @@ export default function SalarySummaryPage() {
         </div>
       </div>
     )
+  }
+
+  const handleExportPDF = async () => {
+    setIsExporting(true)
+    try {
+      const { default: jsPDF } = await import('jspdf')
+      const { default: html2canvas } = await import('html2canvas-pro')
+      
+      const doc = new jsPDF('p', 'mm', 'a4')
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const margin = 15
+      const contentWidth = pageWidth - margin * 2
+      let y = margin
+
+      // Salary month label (e.g. "May 2026 Salary Report")
+      const selectedDate = parseISO(periodDate)
+      const salaryMonthLabel = format(selectedDate, "MMMM yyyy")
+
+      // Title
+      doc.setFontSize(20)
+      doc.setFont('helvetica', 'bold')
+      doc.text(`${salaryMonthLabel} - Salary Report`, margin, y)
+      y += 10
+
+      // Period info
+      doc.setFontSize(11)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(100)
+      doc.text(`Payroll Period: ${format(pStart, "MMM d, yyyy")} — ${format(pEnd, "MMM d, yyyy")}`, margin, y)
+      y += 6
+      doc.text(`Generated: ${format(new Date(), "MMM d, yyyy HH:mm")}`, margin, y)
+      y += 10
+
+      // Divider
+      doc.setDrawColor(200)
+      doc.line(margin, y, pageWidth - margin, y)
+      y += 8
+
+      // Summary box
+      doc.setFillColor(245, 247, 250)
+      doc.roundedRect(margin, y, contentWidth, 28, 3, 3, 'F')
+      
+      doc.setTextColor(60)
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      doc.text('Total Work Time', margin + 8, y + 8)
+      doc.text('Days Worked', margin + 8 + contentWidth / 3, y + 8)
+      doc.text('Total Salary', margin + 8 + (contentWidth / 3) * 2, y + 8)
+      
+      doc.setTextColor(30)
+      doc.setFontSize(16)
+      doc.setFont('helvetica', 'bold')
+      doc.text(`${hours}h ${minutes}m`, margin + 8, y + 20)
+      doc.text(`${summary.totalWorkDays} days`, margin + 8 + contentWidth / 3, y + 20)
+      doc.text(`\u00a5${summary.totalSalaryYen.toLocaleString()}`, margin + 8 + (contentWidth / 3) * 2, y + 20)
+      y += 36
+
+      // Section: Work Day Details
+      doc.setTextColor(30)
+      doc.setFontSize(13)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Work Day Details', margin, y)
+      y += 2
+
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(120)
+      doc.text(`Period: ${format(pStart, "MMM d")} — ${format(pEnd, "MMM d, yyyy")}`, margin, y + 5)
+      y += 10
+
+      // Table header
+      doc.setFillColor(30, 41, 59)
+      doc.roundedRect(margin, y, contentWidth, 10, 2, 2, 'F')
+      doc.setTextColor(255)
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'bold')
+      const colWidths = [contentWidth * 0.06, contentWidth * 0.21, contentWidth * 0.15, contentWidth * 0.15, contentWidth * 0.18, contentWidth * 0.25]
+      const headers = ['#', 'Date', 'Clock In', 'Clock Out', 'Work Time', 'Salary']
+      let xPos = margin
+      headers.forEach((h, i) => {
+        doc.text(h, xPos + 3, y + 7)
+        xPos += colWidths[i]
+      })
+      y += 12
+
+      // Table rows — all days from the payroll period
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      
+      const tableRecords = allDaysInPeriod.map(day => {
+        const dateStr = format(day, "yyyy-MM-dd")
+        const record = summary.records?.find(r => r.attendanceDate === dateStr) ||
+                       yearlySummary.records?.find(r => r.attendanceDate === dateStr)
+        return {
+          attendanceDate: dateStr,
+          clockIn: record?.clockIn || '-',
+          clockOut: record?.clockOut || '-',
+          workMinutes: record?.workMinutes || 0,
+          estimatedSalaryYen: record?.estimatedSalaryYen || 0
+        }
+      })
+      
+      tableRecords.forEach((record: any, idx: number) => {
+        if (y > 270) {
+          doc.addPage()
+          y = margin
+          // Re-draw table header on new page
+          doc.setFillColor(30, 41, 59)
+          doc.roundedRect(margin, y, contentWidth, 10, 2, 2, 'F')
+          doc.setTextColor(255)
+          doc.setFontSize(9)
+          doc.setFont('helvetica', 'bold')
+          xPos = margin
+          headers.forEach((h, i) => {
+            doc.text(h, xPos + 3, y + 7)
+            xPos += colWidths[i]
+          })
+          y += 12
+          doc.setFont('helvetica', 'normal')
+          doc.setFontSize(9)
+        }
+        
+        const bgColor = idx % 2 === 0 ? [255, 255, 255] : [248, 250, 252]
+        doc.setFillColor(bgColor[0], bgColor[1], bgColor[2])
+        doc.rect(margin, y - 4, contentWidth, 9, 'F')
+        
+        doc.setTextColor(50)
+        const rHours = Math.floor(record.workMinutes / 60)
+        const rMins = record.workMinutes % 60
+        const rowData = [
+          `${idx + 1}`,
+          format(parseISO(record.attendanceDate), "MMM d, yyyy"),
+          record.clockIn,
+          record.clockOut,
+          record.workMinutes > 0 ? `${rHours}h ${rMins}m` : '-',
+          record.estimatedSalaryYen > 0 ? `\u00a5${record.estimatedSalaryYen.toLocaleString()}` : '-'
+        ]
+        xPos = margin
+        rowData.forEach((cell, i) => {
+          doc.text(cell, xPos + 3, y + 2)
+          xPos += colWidths[i]
+        })
+        y += 9
+      })
+
+      // Total row at bottom of table
+      const workedDaysCount = tableRecords.filter(r => r.clockIn !== '-').length
+      if (workedDaysCount > 0) {
+        doc.setFillColor(30, 41, 59)
+        doc.rect(margin, y - 4, contentWidth, 10, 'F')
+        doc.setTextColor(255)
+        doc.setFontSize(9)
+        doc.setFont('helvetica', 'bold')
+        doc.text('TOTAL', margin + 3, y + 3)
+        doc.text(`${workedDaysCount} days`, margin + 3 + colWidths[0] + colWidths[1], y + 3)
+        doc.text(`${hours}h ${minutes}m`, margin + 3 + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], y + 3)
+        doc.text(`\u00a5${summary.totalSalaryYen.toLocaleString()}`, margin + 3 + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + colWidths[4], y + 3)
+        y += 14
+      }
+
+      // Chart capture
+      if (chartRef.current) {
+        if (y > 180) {
+          doc.addPage()
+          y = margin
+        }
+        
+        doc.setTextColor(30)
+        doc.setFontSize(13)
+        doc.setFont('helvetica', 'bold')
+        doc.text('Daily Earnings Chart', margin, y)
+        y += 6
+        
+        const canvas = await html2canvas(chartRef.current, {
+          backgroundColor: '#1e293b',
+          scale: 2,
+          useCORS: true,
+        })
+        const imgData = canvas.toDataURL('image/png')
+        const imgWidth = contentWidth
+        const imgHeight = (canvas.height / canvas.width) * imgWidth
+        doc.addImage(imgData, 'PNG', margin, y, imgWidth, Math.min(imgHeight, 90))
+      }
+
+      doc.save(`salary-report-${format(pStart, "yyyy-MM-dd")}-to-${format(pEnd, "yyyy-MM-dd")}.pdf`)
+    } catch (err) {
+      console.error('PDF export failed:', err)
+    } finally {
+      setIsExporting(false)
+    }
   }
 
   return (
@@ -306,6 +499,17 @@ export default function SalarySummaryPage() {
                     </div>
                   </div>
                 </div>
+                <div className="mt-6 pt-4 border-t border-primary/10">
+                  <Button 
+                    onClick={handleExportPDF} 
+                    disabled={isExporting}
+                    className="w-full rounded-xl gap-2"
+                    variant="outline"
+                  >
+                    <Download className="w-4 h-4" />
+                    {isExporting ? 'Generating PDF...' : 'Export PDF'}
+                  </Button>
+                </div>
               </Card>
             </div>
           </div>
@@ -321,7 +525,7 @@ export default function SalarySummaryPage() {
               </CardHeader>
               <CardContent className="h-[400px] w-full overflow-hidden p-2 sm:p-6">
                 {monthlyChartData.length > 0 ? (
-                  <div className="w-full h-full overflow-x-auto pb-2 custom-scrollbar">
+                  <div ref={chartRef} className="w-full h-full overflow-x-auto pb-2 custom-scrollbar">
                     <div className="min-w-[750px] h-full pr-4">
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={monthlyChartData} margin={{ top: 20, right: 20, left: 0, bottom: 25 }}>
