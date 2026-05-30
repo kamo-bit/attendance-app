@@ -40,6 +40,34 @@ export function getPayrollPeriod(dateStr: string) {
   }
 }
 
+export function getSalaryPeriodForMonth(dateStr: string) {
+  // If the user selects "May" (e.g., "2026-05-xx"), the May Salary covers the period from March 21 to April 20.
+  // We parse it manually to avoid JavaScript Date overflow issues (e.g., April 31).
+  const [y, mStr] = dateStr.split('T')[0].split('-')
+  const yNum = Number(y)
+  const mNum = Number(mStr) // 1-indexed month
+  
+  let endMonth = mNum - 1
+  let endYear = yNum
+  if (endMonth < 1) {
+    endMonth += 12
+    endYear--
+  }
+  
+  let startMonth = endMonth - 1
+  let startYear = endYear
+  if (startMonth < 1) {
+    startMonth += 12
+    startYear--
+  }
+  
+  const pad = (n: number) => n.toString().padStart(2, '0')
+  return {
+    start: `${startYear}-${pad(startMonth)}-21`,
+    end: `${endYear}-${pad(endMonth)}-20`
+  }
+}
+
 export function validateAttendanceInput(data: {
   clockIn: string
   clockOut: string

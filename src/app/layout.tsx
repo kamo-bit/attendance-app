@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { MainNav } from "@/components/main-nav";
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const outfit = Outfit({
   variable: "--font-sans",
@@ -39,11 +40,13 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <MainNav />
-          <main className="flex-1 flex flex-col">
-            {children}
-          </main>
-          <Toaster />
+          <TooltipProvider>
+            <MainNav />
+            <main className="flex-1 flex flex-col">
+              {children}
+            </main>
+            <Toaster />
+          </TooltipProvider>
         </ThemeProvider>
       </body>
     </html>

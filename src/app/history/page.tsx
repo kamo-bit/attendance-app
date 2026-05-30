@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { format, parseISO } from "date-fns"
-import { History, Edit, Trash2, Coffee, Clock } from "lucide-react"
+import { History, Edit, Trash2, Coffee, Clock, ChevronLeft, ChevronRight } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -29,6 +29,8 @@ export default function HistoryPage() {
   const router = useRouter()
   const { data: session, isPending } = authClient.useSession()
   const [records, setRecords] = useState<any[]>([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
   
   // Edit Dialog State
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -151,30 +153,29 @@ export default function HistoryPage() {
 
   if (isPending || !session) return null
 
-  // Group records by month
-  const groupedRecords = records.reduce((acc, record) => {
-    const dateObj = parseISO(record.attendanceDate)
-    const monthYear = format(dateObj, "MMMM yyyy")
-    if (!acc[monthYear]) {
-      acc[monthYear] = []
-    }
-    acc[monthYear].push(record)
-    return acc
-  }, {} as Record<string, any[]>)
+  // Sort records by most recently inputted/updated
+  const sortedRecords = [...records].sort((a, b) => {
+    const timeA = new Date(a.updatedAt || a.createdAt || a.attendanceDate).getTime()
+    const timeB = new Date(b.updatedAt || b.createdAt || b.attendanceDate).getTime()
+    return timeB - timeA
+  })
+
+  // Pagination logic
+  const totalPages = Math.ceil(sortedRecords.length / itemsPerPage)
+  const currentRecords = sortedRecords.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
 
   return (
     <div className="container max-w-5xl mx-auto py-10 px-4">
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Attendance History</h1>
         <p className="text-muted-foreground mt-2">
-          View your past attendance records grouped by month.
+          View your past attendance records, ordered by the most recently inputted or updated data.
         </p>
       </div>
 
       <div className="space-y-8">
-        {Object.entries(groupedRecords).map(([monthYear, monthRecords]: [string, any]) => (
-          <div key={monthYear} className="space-y-4">
-            <h2 className="text-2xl font-semibold tracking-tight">{monthYear}</h2>
+        {sortedRecords.length > 0 && (
+          <div className="space-y-4">
             <Card className="rounded-2xl border shadow-sm overflow-hidden">
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
@@ -191,7 +192,7 @@ export default function HistoryPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {monthRecords.map((record: any) => {
+                      {currentRecords.map((record: any) => {
                         const hours = Math.floor(record.workMinutes / 60)
                         const mins = record.workMinutes % 60
                         
@@ -245,10 +246,41 @@ export default function HistoryPage() {
                     </TableBody>
                   </Table>
                 </div>
+
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between px-4 py-4 border-t">
+                    <div className="text-sm text-muted-foreground hidden sm:block">
+                      Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, sortedRecords.length)} of {sortedRecords.length} entries
+                    </div>
+                    <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                      >
+                        <ChevronLeft className="w-4 h-4 sm:mr-1" />
+                        <span className="hidden sm:inline">Previous</span>
+                      </Button>
+                      <div className="text-sm font-medium">
+                        Page {currentPage} of {totalPages}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                      >
+                        <span className="hidden sm:inline">Next</span>
+                        <ChevronRight className="w-4 h-4 sm:ml-1" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
-        ))}
+        )}
         {records.length === 0 && (
           <Card className="rounded-2xl border shadow-sm">
             <CardContent className="h-32 flex items-center justify-center text-muted-foreground">
@@ -326,20 +358,20 @@ export default function HistoryPage() {
                   <div className="space-y-4">
                     <div className="flex flex-col sm:flex-row gap-2 sm:items-center justify-between bg-muted/50 p-3 rounded-lg">
                       <div className="text-sm font-medium shrink-0">Break 1</div>
-                      <div className="flex items-center space-x-2 w-full sm:w-auto flex-1 max-w-[240px]">
-                        <Input type="time" value={editBreak1From} onChange={(e) => setEditBreak1From(e.target.value)} className="h-9 w-full min-w-[90px]" />
-                        <span className="text-muted-foreground shrink-0 text-sm">to</span>
-                        <Input type="time" value={editBreak1To} onChange={(e) => setEditBreak1To(e.target.value)} className="h-9 w-full min-w-[90px]" />
+                      <div className="flex flex-col min-[400px]:flex-row items-center gap-2 w-full sm:w-auto flex-1 sm:max-w-[320px]">
+                        <Input type="time" value={editBreak1From} onChange={(e) => setEditBreak1From(e.target.value)} className="h-9 w-full" />
+                        <span className="text-muted-foreground shrink-0 text-sm hidden min-[400px]:inline">to</span>
+                        <Input type="time" value={editBreak1To} onChange={(e) => setEditBreak1To(e.target.value)} className="h-9 w-full" />
                       </div>
                     </div>
                     
                     {editBreakCount === "2" && (
                       <div className="flex flex-col sm:flex-row gap-2 sm:items-center justify-between bg-muted/50 p-3 rounded-lg">
                         <div className="text-sm font-medium shrink-0">Break 2</div>
-                        <div className="flex items-center space-x-2 w-full sm:w-auto flex-1 max-w-[240px]">
-                          <Input type="time" value={editBreak2From} onChange={(e) => setEditBreak2From(e.target.value)} className="h-9 w-full min-w-[90px]" />
-                          <span className="text-muted-foreground shrink-0 text-sm">to</span>
-                          <Input type="time" value={editBreak2To} onChange={(e) => setEditBreak2To(e.target.value)} className="h-9 w-full min-w-[90px]" />
+                        <div className="flex flex-col min-[400px]:flex-row items-center gap-2 w-full sm:w-auto flex-1 sm:max-w-[320px]">
+                          <Input type="time" value={editBreak2From} onChange={(e) => setEditBreak2From(e.target.value)} className="h-9 w-full" />
+                          <span className="text-muted-foreground shrink-0 text-sm hidden min-[400px]:inline">to</span>
+                          <Input type="time" value={editBreak2To} onChange={(e) => setEditBreak2To(e.target.value)} className="h-9 w-full" />
                         </div>
                       </div>
                     )}

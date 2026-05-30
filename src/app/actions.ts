@@ -20,18 +20,18 @@ async function getSession() {
 export async function getSalarySettings() {
   const user = await getSession()
   const settings = await db.select().from(salarySettings).where(eq(salarySettings.userId, user.id)).limit(1)
-  
+
   if (settings.length > 0) {
     return settings[0]
   }
-  
+
   // Create default if not exists
   const [newSetting] = await db.insert(salarySettings).values({
     userId: user.id,
     hourlyWageYen: 1115,
     effectiveFrom: new Date().toISOString().split('T')[0]
   }).returning()
-  
+
   return newSetting
 }
 
@@ -40,13 +40,13 @@ export async function updateSalarySettings(wage: number) {
   await db.update(salarySettings)
     .set({ hourlyWageYen: wage, updatedAt: new Date() })
     .where(eq(salarySettings.userId, user.id))
-  
+
   revalidatePath('/')
 }
 
 export async function saveAttendance(data: any) {
   const user = await getSession()
-  
+
   const existing = await db.select().from(attendanceRecords).where(
     and(
       eq(attendanceRecords.userId, user.id),
@@ -108,8 +108,25 @@ export async function getTodayAttendance(date: string) {
       eq(schema.attendanceRecords.attendanceDate, date)
     )
   ).limit(1)
-  
+
   return records.length > 0 ? records[0] : null
+}
+
+export async function getLatestAttendanceRecord() {
+  const user = await getSession()
+  const records = await db.select().from(schema.attendanceRecords)
+    .where(eq(schema.attendanceRecords.userId, user.id))
+
+  if (records.length === 0) return null;
+
+  // Sort by most recently updated/created to match "terakhir kali diinput"
+  const sorted = [...records].sort((a: any, b: any) => {
+    const timeA = new Date(a.updatedAt || a.createdAt || a.attendanceDate).getTime()
+    const timeB = new Date(b.updatedAt || b.createdAt || b.attendanceDate).getTime()
+    return timeB - timeA
+  })
+
+  return sorted[0]
 }
 
 export async function getSalarySummary(periodStart: string, periodEnd: string) {
@@ -121,10 +138,10 @@ export async function getSalarySummary(periodStart: string, periodEnd: string) {
       lte(schema.attendanceRecords.attendanceDate, periodEnd)
     )
   )
-  
+
   const totalMins = records.reduce((sum, r) => sum + r.workMinutes, 0)
   const totalSalary = records.reduce((sum, r) => sum + r.estimatedSalaryYen, 0)
-  
+
   return {
     totalWorkMinutes: totalMins,
     totalWorkDays: records.filter(r => r.clockIn).length,
@@ -142,39 +159,40 @@ export async function getYearlySummary(year: string) {
       lte(attendanceRecords.attendanceDate, `${year}-12-31`)
     )
   )
-  
+
   const totalMins = records.reduce((sum, r) => sum + r.workMinutes, 0)
   const totalSalary = records.reduce((sum, r) => sum + r.estimatedSalaryYen, 0)
-  
+
   return {
     totalWorkMinutes: totalMins,
     totalWorkDays: records.filter(r => r.clockIn).length,
     totalSalaryYen: totalSalary,
+    records,
   }
 }
 
 export async function getLatestResetLink(email: string) {
   try {
     // Note: This is purely for development/testing
-    
+
     // Give Better Auth a moment to insert the token
     await new Promise(resolve => setTimeout(resolve, 1500));
-    
+
     // 1. Find user by email
     const user = await db.query.users.findFirst({
       where: eq(schema.users.email, email)
     });
-    
+
     if (!user) return null;
-    
+
     // 2. Find the latest verification token for this user
     const identifier = `reset-password:${user.id}`;
-    
+
     const latestVerif = await db.query.verifications.findFirst({
       where: eq(schema.verifications.identifier, identifier),
       orderBy: [desc(schema.verifications.createdAt)]
     });
-    
+
     if (latestVerif) {
       // 3. Extract the token (which IS the identifier part!)
       const token = latestVerif.identifier.split(":")[1];
@@ -183,7 +201,7 @@ export async function getLatestResetLink(email: string) {
         return { url: `/reset-password?token=${token}` };
       }
     }
-    
+
     return null;
   } catch (e) {
     console.error(e)
@@ -194,19 +212,19 @@ export async function getLatestResetLink(email: string) {
 export async function directResetPassword(email: string, newPassword: string) {
   try {
     const { hashPassword } = await import("better-auth/crypto");
-    
+
     // 1. Find user by email
     const user = await db.query.users.findFirst({
       where: eq(schema.users.email, email)
     });
-    
+
     if (!user) {
       return { error: "Email not found in our system" };
     }
-    
+
     // 2. Hash the new password
     const hashedPassword = await hashPassword(newPassword);
-    
+
     // 3. Find if they have a credential account
     const existingAccount = await db.query.accounts.findFirst({
       where: and(
@@ -214,7 +232,7 @@ export async function directResetPassword(email: string, newPassword: string) {
         eq(schema.accounts.providerId, "credential")
       )
     });
-    
+
     if (existingAccount) {
       // Update existing password
       await db.update(schema.accounts)
@@ -232,7 +250,7 @@ export async function directResetPassword(email: string, newPassword: string) {
         updatedAt: new Date(),
       });
     }
-    
+
     return { success: true };
   } catch (e: any) {
     console.error("Direct reset failed:", e);

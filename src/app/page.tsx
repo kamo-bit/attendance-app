@@ -12,7 +12,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
 import { authClient } from "@/lib/auth-client"
-import { getSalarySettings, updateSalarySettings, saveAttendance, getTodayAttendance } from "@/app/actions"
+import { getSalarySettings, updateSalarySettings, saveAttendance, getTodayAttendance, getLatestAttendanceRecord } from "@/app/actions"
 import { getPayrollPeriod, validateAttendanceInput } from "@/lib/utils"
 import { toast } from "sonner"
 
@@ -71,14 +71,29 @@ export default function Home() {
           setWorkMinutes(todayRecord.workMinutes)
           setIsCompletedRecord(todayRecord.status === "completed")
         } else {
-          // Reset fields for new date
-          setClockIn("")
-          setHasBreak(false)
-          setBreak1From("")
-          setBreak1To("")
-          setBreak2From("")
-          setBreak2To("")
-          setClockOut("")
+          // Fetch the most recently inputted record to use as defaults
+          const latestRecord = await getLatestAttendanceRecord()
+          
+          if (latestRecord) {
+            setClockIn(latestRecord.clockIn || "")
+            setHasBreak(latestRecord.hasBreak || false)
+            setBreakCount(latestRecord.breakCount === 2 ? "2" : "1")
+            setBreak1From(latestRecord.break1From || "")
+            setBreak1To(latestRecord.break1To || "")
+            setBreak2From(latestRecord.break2From || "")
+            setBreak2To(latestRecord.break2To || "")
+            setClockOut(latestRecord.clockOut || "")
+          } else {
+            // Reset fields for new date if completely empty history
+            setClockIn("")
+            setHasBreak(false)
+            setBreak1From("")
+            setBreak1To("")
+            setBreak2From("")
+            setBreak2To("")
+            setClockOut("")
+          }
+          
           setWorkMinutes(0)
           setIsCompletedRecord(false)
         }
@@ -194,12 +209,12 @@ export default function Home() {
         <div className="lg:col-span-2 space-y-6">
           <Card className="rounded-2xl shadow-sm border overflow-hidden transition-all duration-300 hover:shadow-md">
             <CardHeader className="bg-primary/5 pb-8 pt-8">
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <CardTitle className="flex items-center gap-2">
                   <CalendarIcon className="w-5 h-5 text-primary" />
                   Clock In / Out
                 </CardTitle>
-                <div className="text-sm font-medium bg-background px-3 py-1 rounded-full border shadow-sm">
+                <div className="text-sm font-medium bg-background px-3 py-1 rounded-full border shadow-sm self-start sm:self-auto">
                   {format(displayDate, "EEEE, MMM d, yyyy")}
                 </div>
               </div>
@@ -212,20 +227,20 @@ export default function Home() {
               {/* Date Input */}
               <div className="space-y-3">
                 <Label htmlFor="date-input" className="text-base font-semibold">Log Date</Label>
-                <div className="flex items-center space-x-2">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:space-x-2">
                   <Input 
                     id="date-input"
                     type="date"
                     value={attendanceDate}
                     onChange={(e) => setAttendanceDate(e.target.value)}
-                    className="max-w-[200px]"
+                    className="w-full sm:max-w-[200px]"
                   />
-                  <span className="text-sm text-muted-foreground ml-2">You can log past dates here.</span>
+                  <span className="text-sm text-muted-foreground sm:ml-2">You can log past dates here.</span>
                 </div>
               </div>
 
               {/* Time Inputs */}
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="space-y-3">
                   <Label htmlFor="in" className="text-base font-semibold flex items-center gap-2">
                     <Clock className="w-4 h-4 text-emerald-500" /> Time In
@@ -254,7 +269,7 @@ export default function Home() {
 
               {/* Breaks Section */}
               <div className="rounded-xl border bg-card p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                   <div className="space-y-1">
                     <Label htmlFor="break-switch" className="text-base font-semibold flex items-center gap-2">
                       <Coffee className="w-4 h-4 text-amber-500" /> Take a break?
@@ -265,6 +280,7 @@ export default function Home() {
                     id="break-switch" 
                     checked={hasBreak}
                     onCheckedChange={setHasBreak}
+                    className="self-start sm:self-auto"
                   />
                 </div>
 
@@ -288,20 +304,20 @@ export default function Home() {
                     <div className="space-y-4">
                       <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between bg-muted/50 p-4 rounded-lg">
                         <div className="text-sm font-medium shrink-0">Break 1</div>
-                        <div className="flex items-center space-x-2 w-full sm:w-auto flex-1 max-w-[240px]">
-                          <Input type="time" value={break1From} onChange={(e) => setBreak1From(e.target.value)} className="h-9 flex-1 w-full min-w-[90px]" />
-                          <span className="text-muted-foreground shrink-0 text-sm">to</span>
-                          <Input type="time" value={break1To} onChange={(e) => setBreak1To(e.target.value)} className="h-9 flex-1 w-full min-w-[90px]" />
+                        <div className="flex flex-col min-[400px]:flex-row items-center gap-2 w-full sm:w-auto flex-1 sm:max-w-[320px]">
+                          <Input type="time" value={break1From} onChange={(e) => setBreak1From(e.target.value)} className="h-9 flex-1 w-full" />
+                          <span className="text-muted-foreground shrink-0 text-sm hidden min-[400px]:inline">to</span>
+                          <Input type="time" value={break1To} onChange={(e) => setBreak1To(e.target.value)} className="h-9 flex-1 w-full" />
                         </div>
                       </div>
                       
                       {breakCount === "2" && (
                         <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between bg-muted/50 p-4 rounded-lg animate-in fade-in zoom-in duration-300">
                           <div className="text-sm font-medium shrink-0">Break 2</div>
-                          <div className="flex items-center space-x-2 w-full sm:w-auto flex-1 max-w-[240px]">
-                            <Input type="time" value={break2From} onChange={(e) => setBreak2From(e.target.value)} className="h-9 flex-1 w-full min-w-[90px]" />
-                            <span className="text-muted-foreground shrink-0 text-sm">to</span>
-                            <Input type="time" value={break2To} onChange={(e) => setBreak2To(e.target.value)} className="h-9 flex-1 w-full min-w-[90px]" />
+                          <div className="flex flex-col min-[400px]:flex-row items-center gap-2 w-full sm:w-auto flex-1 sm:max-w-[320px]">
+                            <Input type="time" value={break2From} onChange={(e) => setBreak2From(e.target.value)} className="h-9 flex-1 w-full" />
+                            <span className="text-muted-foreground shrink-0 text-sm hidden min-[400px]:inline">to</span>
+                            <Input type="time" value={break2To} onChange={(e) => setBreak2To(e.target.value)} className="h-9 flex-1 w-full" />
                           </div>
                         </div>
                       )}

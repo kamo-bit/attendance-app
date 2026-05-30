@@ -28,7 +28,6 @@ export function MainNav() {
     { href: "/", label: "Today" },
     { href: "/history", label: "History" },
     { href: "/salary-summary", label: "Summary" },
-    { href: "/yearly", label: "Yearly" },
   ]
 
   return (
@@ -41,7 +40,7 @@ export function MainNav() {
             </span>
           </Link>
           <nav className="flex items-center space-x-6 text-sm font-medium">
-            {navLinks.map((link) => (
+            {(!isPending && session) && navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
@@ -70,7 +69,7 @@ export function MainNav() {
                   <Link href="/" onClick={() => setOpen(false)} className="font-bold mb-2 text-lg">
                     Attendance App
                   </Link>
-                  {navLinks.map((link) => (
+                  {(!isPending && session) && navLinks.map((link) => (
                     <Link
                       key={link.href}
                       href={link.href}
@@ -103,7 +102,7 @@ export function MainNav() {
                 </div>
               </SheetContent>
             </Sheet>
-            <span className="font-bold truncate">Attendance App</span>
+            <Link href="/" className="font-bold truncate">Attendance App</Link>
           </div>
           <nav className="flex items-center space-x-2">
             <ThemeToggle />
