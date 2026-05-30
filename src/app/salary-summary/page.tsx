@@ -528,17 +528,16 @@ export default function SalarySummaryPage() {
                   <div ref={chartRef} className="w-full h-full overflow-x-auto pb-2 custom-scrollbar">
                     <div className="min-w-[750px] h-full pr-4">
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={monthlyChartData} margin={{ top: 20, right: 20, left: 0, bottom: 25 }}>
+                        <LineChart data={monthlyChartData} margin={{ top: 20, right: 20, left: 0, bottom: 45 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={true} horizontal={true} stroke="hsl(var(--border))" />
                       <XAxis 
                         dataKey="date" 
-                        tick={{ fill: '#ffffff', fontSize: 12 }} 
+                        tick={{ fill: '#ffffff', fontSize: 12, angle: -45, textAnchor: 'end', dx: -2, dy: 5 }} 
                         tickLine={{ stroke: '#ffffff' }}
                         axisLine={{ stroke: '#ffffff', strokeWidth: 1 }}
                         interval={0}
                         minTickGap={0}
-                        dy={10}
-                        label={{ value: 'Date', position: 'insideBottom', offset: -15, fill: '#ffffff', fontSize: 13 }}
+                        label={{ value: 'Date', position: 'insideBottom', offset: -30, fill: '#ffffff', fontSize: 13 }}
                       />
                       <YAxis 
                         tick={{ fill: '#ffffff', fontSize: 12 }} 
