@@ -66,9 +66,19 @@ export default function HistoryPage() {
   if (isPending || !session) return null
 
   // Sort records by most recently inputted/updated
+  const normalizeTime = (val: any) => {
+    if (!val) return 0;
+    let time = new Date(val).getTime();
+    if (time > 0 && time < 100000000000) {
+      // time is in seconds, convert to milliseconds
+      time *= 1000;
+    }
+    return time;
+  }
+
   const sortedRecords = [...records].sort((a, b) => {
-    const timeA = new Date(a.updatedAt || a.createdAt || a.attendanceDate).getTime()
-    const timeB = new Date(b.updatedAt || b.createdAt || b.attendanceDate).getTime()
+    const timeA = Math.max(normalizeTime(a.updatedAt), normalizeTime(a.createdAt), new Date(a.attendanceDate).getTime())
+    const timeB = Math.max(normalizeTime(b.updatedAt), normalizeTime(b.createdAt), new Date(b.attendanceDate).getTime())
     return timeB - timeA
   })
 
@@ -142,11 +152,11 @@ export default function HistoryPage() {
                             </TableCell>
                             <TableCell className="text-right">
                               {(() => {
-                                const createdTime = record.createdAt ? new Date(record.createdAt).getTime() : 0;
-                                const updatedTime = record.updatedAt ? new Date(record.updatedAt).getTime() : 0;
+                                const createdTime = normalizeTime(record.createdAt);
+                                const updatedTime = normalizeTime(record.updatedAt);
                                 const isDeleted = record.status === "deleted";
                                 const isEdited = updatedTime > createdTime + 1000;
-                                const actionDate = record.updatedAt ? new Date(record.updatedAt) : (record.createdAt ? new Date(record.createdAt) : parseISO(record.attendanceDate));
+                                const actionDate = new Date(Math.max(updatedTime, createdTime, new Date(record.attendanceDate).getTime()));
                                 
                                 return (
                                   <div className="flex flex-col items-end text-xs text-muted-foreground whitespace-nowrap">
