@@ -89,6 +89,10 @@ export function validateAttendanceInput(data: {
   const inMins = toMinutes(clockIn)
   const outMins = toMinutes(clockOut)
 
+  if (clockOut && !clockIn) {
+    return "Time In is required when Time Out is provided."
+  }
+
   if (clockIn && clockOut && outMins <= inMins) {
     return "Clock Out must be later than Clock In."
   }

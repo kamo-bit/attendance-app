@@ -11,11 +11,13 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/components/ui/sheet"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 export function MainNav() {
   const pathname = usePathname()
   const router = useRouter()
   const [open, setOpen] = useState(false)
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false)
   const { data: session, isPending } = authClient.useSession()
 
   const handleLogout = async () => {
@@ -97,7 +99,7 @@ export function MainNav() {
                         </div>
                       </div>
                       <button
-                        onClick={handleLogout}
+                        onClick={() => setShowLogoutDialog(true)}
                         className="text-left text-foreground/60 hover:text-foreground transition-colors font-medium flex items-center"
                       >
                         <LogOut className="mr-2 h-4 w-4" /> Logout
@@ -129,7 +131,7 @@ export function MainNav() {
                   </div>
                   <span className="text-sm font-medium max-w-[120px] truncate">{session.user?.name || session.user?.email}</span>
                 </div>
-                <Button variant="ghost" size="sm" onClick={handleLogout}>
+                <Button variant="ghost" size="sm" onClick={() => setShowLogoutDialog(true)}>
                   <LogOut className="h-4 w-4" />
                 </Button>
               </div>
@@ -141,6 +143,25 @@ export function MainNav() {
           </nav>
         </div>
       </div>
+
+      <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirm Logout</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to log out of your account?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 flex sm:justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowLogoutDialog(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleLogout}>
+              Logout
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </header>
   )
 }

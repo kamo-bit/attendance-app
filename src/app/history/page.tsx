@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { format, parseISO } from "date-fns"
-import { History, Edit, Trash2, Coffee, Clock, ChevronLeft, ChevronRight } from "lucide-react"
+import { History, Edit, Trash2, Coffee, Clock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -61,95 +61,7 @@ export default function HistoryPage() {
     loadRecords()
   }, [session])
 
-  const handleDelete = async (id: string) => {
-    try {
-      await deleteAttendance(id)
-      await loadRecords()
-      toast.success("Record deleted successfully")
-    } catch (error) {
-      toast.error("Failed to delete record")
-    }
-  }
-
-  const handleEditClick = (record: any) => {
-    setEditingRecord(record)
-    setEditClockIn(record.clockIn || "")
-    setEditClockOut(record.clockOut || "")
-    
-    setEditHasBreak(record.hasBreak || false)
-    setEditBreakCount(record.breakCount === 2 ? "2" : "1")
-    setEditBreak1From(record.break1From || "")
-    setEditBreak1To(record.break1To || "")
-    setEditBreak2From(record.break2From || "")
-    setEditBreak2To(record.break2To || "")
-    
-    setIsEditDialogOpen(true)
-  }
-
-  const handleSaveEdit = async () => {
-    if (!editingRecord) return
-    
-    const validationError = validateAttendanceInput({
-      clockIn: editClockIn, 
-      clockOut: editClockOut, 
-      hasBreak: editHasBreak, 
-      breakCount: editHasBreak ? (editBreakCount as any) : 0, 
-      break1From: editBreak1From, 
-      break1To: editBreak1To, 
-      break2From: editBreak2From, 
-      break2To: editBreak2To
-    })
-
-    if (validationError) {
-      toast.error(validationError)
-      return
-    }
-
-    const calculateMinutes = (start: string, end: string) => {
-      if (!start || !end) return 0
-      const [h1, m1] = start.split(":").map(Number)
-      const [h2, m2] = end.split(":").map(Number)
-      return (h2 * 60 + m2) - (h1 * 60 + m1)
-    }
-
-    let workMinutes = 0
-    if (editClockIn && editClockOut) {
-      workMinutes = calculateMinutes(editClockIn, editClockOut)
-      if (editHasBreak) {
-        if (editBreak1From && editBreak1To) {
-          workMinutes -= calculateMinutes(editBreak1From, editBreak1To)
-        }
-        if (editBreakCount === "2" && editBreak2From && editBreak2To) {
-          workMinutes -= calculateMinutes(editBreak2From, editBreak2To)
-        }
-      }
-    }
-    workMinutes = Math.max(0, workMinutes)
-    
-    const hourlyWageYen = editingRecord.hourlyWageYen || 1115
-    const estimatedSalaryYen = Math.floor((workMinutes / 60) * hourlyWageYen)
-
-    try {
-      await updateAttendance(editingRecord.id, {
-        clockIn: editClockIn,
-        clockOut: editClockOut,
-        hasBreak: editHasBreak,
-        breakCount: editHasBreak ? Number(editBreakCount) : 0,
-        break1From: editHasBreak ? editBreak1From : null,
-        break1To: editHasBreak ? editBreak1To : null,
-        break2From: editHasBreak && editBreakCount === "2" ? editBreak2From : null,
-        break2To: editHasBreak && editBreakCount === "2" ? editBreak2To : null,
-        workMinutes,
-        estimatedSalaryYen,
-        status: editClockOut ? "completed" : "draft"
-      })
-      setIsEditDialogOpen(false)
-      await loadRecords()
-      toast.success("Record updated successfully")
-    } catch (error) {
-      toast.error("Failed to update record")
-    }
-  }
+    // States and handlers for editing and deleting have been moved to the Summary page.
 
   if (isPending || !session) return null
 
@@ -188,7 +100,7 @@ export default function HistoryPage() {
                         <TableHead>Breaks</TableHead>
                         <TableHead className="text-right">Work Hours</TableHead>
                         <TableHead className="text-right">Salary</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                        <TableHead className="text-right">Status / Time</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -203,13 +115,13 @@ export default function HistoryPage() {
                         }
 
                         return (
-                          <TableRow key={record.id}>
-                            <TableCell className="font-medium whitespace-nowrap">
+                          <TableRow key={record.id} className={record.status === "deleted" ? "opacity-60 bg-muted/30" : ""}>
+                            <TableCell className={`font-medium whitespace-nowrap ${record.status === "deleted" ? "line-through text-muted-foreground" : ""}`}>
                               {format(parseISO(record.attendanceDate), "MMM d, yyyy")}
                             </TableCell>
-                            <TableCell>{record.clockIn || "-"}</TableCell>
-                            <TableCell>{record.clockOut || "-"}</TableCell>
-                            <TableCell>
+                            <TableCell className={record.status === "deleted" ? "line-through text-muted-foreground" : ""}>{record.clockIn || "-"}</TableCell>
+                            <TableCell className={record.status === "deleted" ? "line-through text-muted-foreground" : ""}>{record.clockOut || "-"}</TableCell>
+                            <TableCell className={record.status === "deleted" ? "line-through opacity-50" : ""}>
                               {!record.hasBreak || record.breakCount === 0 ? (
                                 <span className="text-muted-foreground">-</span>
                               ) : (
@@ -222,23 +134,29 @@ export default function HistoryPage() {
                                 </div>
                               )}
                             </TableCell>
-                            <TableCell className="text-right whitespace-nowrap">
+                            <TableCell className={`text-right whitespace-nowrap ${record.status === "deleted" ? "line-through text-muted-foreground" : ""}`}>
                               {hours}h {mins}m
                             </TableCell>
-                            <TableCell className="text-right text-primary font-medium">
+                            <TableCell className={`text-right font-medium ${record.status === "deleted" ? "line-through text-muted-foreground" : "text-primary"}`}>
                               ¥{(record.estimatedSalaryYen || 0).toLocaleString()}
                             </TableCell>
                             <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleEditClick(record)}>
-                                  <Edit className="h-4 w-4" />
-                                  <span className="sr-only">Edit</span>
-                                </Button>
-                                <Button variant="outline" size="icon" className="h-8 w-8 text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive" onClick={() => handleDelete(record.id)}>
-                                  <Trash2 className="h-4 w-4" />
-                                  <span className="sr-only">Delete</span>
-                                </Button>
-                              </div>
+                              {(() => {
+                                const createdTime = record.createdAt ? new Date(record.createdAt).getTime() : 0;
+                                const updatedTime = record.updatedAt ? new Date(record.updatedAt).getTime() : 0;
+                                const isDeleted = record.status === "deleted";
+                                const isEdited = updatedTime > createdTime + 1000;
+                                const actionDate = record.updatedAt ? new Date(record.updatedAt) : (record.createdAt ? new Date(record.createdAt) : parseISO(record.attendanceDate));
+                                
+                                return (
+                                  <div className="flex flex-col items-end text-xs text-muted-foreground whitespace-nowrap">
+                                    <span className={isDeleted ? "text-rose-500 font-bold" : (isEdited ? "text-amber-500 font-medium" : "text-emerald-500 font-medium")}>
+                                      {isDeleted ? "Deleted" : (isEdited ? "Edited" : "Created")}
+                                    </span>
+                                    <span>{format(actionDate, "MMM d, HH:mm")}</span>
+                                  </div>
+                                )
+                              })()}
                             </TableCell>
                           </TableRow>
                         )
@@ -253,6 +171,16 @@ export default function HistoryPage() {
                       Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, sortedRecords.length)} of {sortedRecords.length} entries
                     </div>
                     <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(1)}
+                        disabled={currentPage === 1}
+                        title="Go to first page"
+                      >
+                        <ChevronsLeft className="w-4 h-4" />
+                        <span className="sr-only">Start</span>
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
@@ -274,6 +202,16 @@ export default function HistoryPage() {
                         <span className="hidden sm:inline">Next</span>
                         <ChevronRight className="w-4 h-4 sm:ml-1" />
                       </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(totalPages)}
+                        disabled={currentPage === totalPages}
+                        title="Go to last page"
+                      >
+                        <span className="sr-only">End</span>
+                        <ChevronsRight className="w-4 h-4" />
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -289,102 +227,6 @@ export default function HistoryPage() {
           </Card>
         )}
       </div>
-
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Edit Record</DialogTitle>
-            <DialogDescription>
-              {editingRecord && format(parseISO(editingRecord.attendanceDate), "EEEE, MMM d, yyyy")}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-1">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="clock-in" className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-emerald-500" /> Clock In
-                </Label>
-                <Input
-                  id="clock-in"
-                  type="time"
-                  value={editClockIn}
-                  onChange={(e) => setEditClockIn(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="clock-out" className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-rose-500" /> Clock Out
-                </Label>
-                <Input
-                  id="clock-out"
-                  type="time"
-                  value={editClockOut}
-                  onChange={(e) => setEditClockOut(e.target.value)}
-                />
-              </div>
-            </div>
-            
-            <div className="rounded-xl border bg-card p-4 shadow-sm mt-2">
-              <div className="flex items-center justify-between mb-4">
-                <div className="space-y-1">
-                  <Label htmlFor="break-switch" className="flex items-center gap-2">
-                    <Coffee className="w-4 h-4 text-amber-500" /> Take a break?
-                  </Label>
-                </div>
-                <Switch 
-                  id="break-switch" 
-                  checked={editHasBreak}
-                  onCheckedChange={setEditHasBreak}
-                />
-              </div>
-
-              {editHasBreak && (
-                <div className="space-y-4 pt-4 border-t">
-                  <RadioGroup 
-                    value={editBreakCount} 
-                    onValueChange={(val) => setEditBreakCount(val as "1" | "2")}
-                    className="flex space-x-4"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="1" id="e-r1" />
-                      <Label htmlFor="e-r1">1 Break</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="2" id="e-r2" />
-                      <Label htmlFor="e-r2">2 Breaks</Label>
-                    </div>
-                  </RadioGroup>
-
-                  <div className="space-y-4">
-                    <div className="flex flex-col sm:flex-row gap-2 sm:items-center justify-between bg-muted/50 p-3 rounded-lg">
-                      <div className="text-sm font-medium shrink-0">Break 1</div>
-                      <div className="flex flex-col min-[400px]:flex-row items-center gap-2 w-full sm:w-auto flex-1 sm:max-w-[320px]">
-                        <Input type="time" value={editBreak1From} onChange={(e) => setEditBreak1From(e.target.value)} className="h-9 w-full" />
-                        <span className="text-muted-foreground shrink-0 text-sm hidden min-[400px]:inline">to</span>
-                        <Input type="time" value={editBreak1To} onChange={(e) => setEditBreak1To(e.target.value)} className="h-9 w-full" />
-                      </div>
-                    </div>
-                    
-                    {editBreakCount === "2" && (
-                      <div className="flex flex-col sm:flex-row gap-2 sm:items-center justify-between bg-muted/50 p-3 rounded-lg">
-                        <div className="text-sm font-medium shrink-0">Break 2</div>
-                        <div className="flex flex-col min-[400px]:flex-row items-center gap-2 w-full sm:w-auto flex-1 sm:max-w-[320px]">
-                          <Input type="time" value={editBreak2From} onChange={(e) => setEditBreak2From(e.target.value)} className="h-9 w-full" />
-                          <span className="text-muted-foreground shrink-0 text-sm hidden min-[400px]:inline">to</span>
-                          <Input type="time" value={editBreak2To} onChange={(e) => setEditBreak2To(e.target.value)} className="h-9 w-full" />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={handleSaveEdit} className="w-full">Save changes</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

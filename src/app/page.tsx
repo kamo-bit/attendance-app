@@ -11,8 +11,9 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { authClient } from "@/lib/auth-client"
-import { getSalarySettings, updateSalarySettings, saveAttendance, getTodayAttendance, getLatestAttendanceRecord } from "@/app/actions"
+import { getSalarySettings, updateSalarySettings, saveAttendance, getTodayAttendance, getLatestAttendanceRecord, getUserHolidays } from "@/app/actions"
 import { getPayrollPeriod, validateAttendanceInput } from "@/lib/utils"
 import { toast } from "sonner"
 
@@ -33,9 +34,16 @@ export default function Home() {
   const [workMinutes, setWorkMinutes] = useState(0)
   const [hourlyWage, setHourlyWage] = useState(1115)
   const [isSaving, setIsSaving] = useState(false)
-  
-  // Track if the record for this date is already completed
   const [isCompletedRecord, setIsCompletedRecord] = useState(false)
+  
+  const [showHolidayWarning, setShowHolidayWarning] = useState(false)
+  const [currentTime, setCurrentTime] = useState<Date | null>(null)
+
+  useEffect(() => {
+    setCurrentTime(new Date())
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
+    return () => clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     if (!isPending && !session) {
@@ -97,8 +105,8 @@ export default function Home() {
           setWorkMinutes(0)
           setIsCompletedRecord(false)
         }
-      } catch (e) {
-        console.error(e)
+      } catch (error) {
+        console.error(error)
       }
     }
     
@@ -136,12 +144,7 @@ export default function Home() {
   }
 
   const handleSaveAttendance = async () => {
-    if (!attendanceDate || !clockIn) return
-    
-    if (isCompletedRecord) {
-      toast.error("Attendance for this date is already completed. Please edit it from the History page.")
-      return
-    }
+    if (!attendanceDate) return
 
     const validationError = validateAttendanceInput({
       clockIn, clockOut, hasBreak, breakCount: hasBreak ? (breakCount as any) : 0, 
@@ -153,10 +156,39 @@ export default function Home() {
       return
     }
 
+    try {
+      const savedHolidays = await getUserHolidays()
+      if (savedHolidays && savedHolidays.includes(attendanceDate)) {
+        setShowHolidayWarning(true)
+        return
+      }
+    } catch (e) {
+      console.error("Failed to check holidays", e)
+    }
+
+    await performSave()
+  }
+
+  const performSave = async () => {
+    setShowHolidayWarning(false)
     setIsSaving(true)
     
     try {
-      const estimatedSalaryYen = Math.floor((workMinutes / 60) * hourlyWage)
+      let finalWorkMinutes = 0
+      if (clockIn && clockOut) {
+        finalWorkMinutes = calculateMinutes(clockIn, clockOut)
+        if (hasBreak) {
+          if (break1From && break1To) {
+            finalWorkMinutes -= calculateMinutes(break1From, break1To)
+          }
+          if (breakCount === "2" && break2From && break2To) {
+            finalWorkMinutes -= calculateMinutes(break2From, break2To)
+          }
+        }
+        finalWorkMinutes = Math.max(0, finalWorkMinutes)
+      }
+
+      const estimatedSalaryYen = Math.floor((finalWorkMinutes / 60) * hourlyWage)
       const period = getPayrollPeriod(attendanceDate)
       
       await saveAttendance({
@@ -169,13 +201,16 @@ export default function Home() {
         break2From: hasBreak && breakCount === "2" ? break2From : null,
         break2To: hasBreak && breakCount === "2" ? break2To : null,
         clockOut,
-        workMinutes,
+        workMinutes: finalWorkMinutes,
         hourlyWageYen: hourlyWage,
         estimatedSalaryYen,
         payrollPeriodStart: period.start,
         payrollPeriodEnd: period.end,
         status: clockOut ? "completed" : "draft"
       })
+      if (clockOut) {
+        setIsCompletedRecord(true)
+      }
       toast.success("Attendance saved successfully")
     } catch (e) {
       console.error(e)
@@ -214,8 +249,15 @@ export default function Home() {
                   <CalendarIcon className="w-5 h-5 text-primary" />
                   Clock In / Out
                 </CardTitle>
-                <div className="text-sm font-medium bg-background px-3 py-1 rounded-full border shadow-sm self-start sm:self-auto">
-                  {format(displayDate, "EEEE, MMM d, yyyy")}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                  {currentTime && (
+                    <div className="text-xl sm:text-2xl font-black tracking-tighter text-primary font-mono">
+                      {format(currentTime, "HH:mm:ss")}
+                    </div>
+                  )}
+                  <div className="text-sm font-medium bg-background px-3 py-1 rounded-full border shadow-sm">
+                    {format(displayDate, "EEEE, MMM d, yyyy")}
+                  </div>
                 </div>
               </div>
               <CardDescription className="pt-2">
@@ -325,22 +367,24 @@ export default function Home() {
                   </div>
                 )}
               </div>
-
               {isCompletedRecord && (
-                <div className="bg-amber-500/10 text-amber-600 border border-amber-500/20 p-4 rounded-xl text-sm flex items-start gap-2">
-                  <div className="mt-0.5">⚠️</div>
+                <div className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 p-4 rounded-xl text-sm flex items-start gap-2 mt-6">
+                  <div className="mt-0.5">
+                    <CheckCircle2 className="w-4 h-4" />
+                  </div>
                   <div>
-                    <strong>Record Completed</strong>
-                    <p>Attendance for this date has already been completed. To make changes, please use the Edit function on the History page.</p>
+                    <strong>Attendance Completed</strong>
+                    <p>You have already completed your attendance for today. Please edit from the History page to make changes.</p>
                   </div>
                 </div>
               )}
-            </CardContent>
+
+              </CardContent>
             <CardFooter className="bg-muted/30 pt-6">
               <Button 
                 onClick={handleSaveAttendance} 
                 className="w-full h-12 text-lg rounded-xl"
-                disabled={!clockIn || isSaving || isCompletedRecord}
+                disabled={isSaving || isCompletedRecord}
               >
                 {isSaving ? "Saving..." : "Save Record"}
               </Button>
@@ -382,6 +426,25 @@ export default function Home() {
           </Card>
         </div>
       </div>
+
+      <Dialog open={showHolidayWarning} onOpenChange={setShowHolidayWarning}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Holiday Work</DialogTitle>
+            <DialogDescription>
+              The date you selected ({format(displayDate, "MMM d, yyyy")}) is marked as a holiday. Are you sure you want to log work hours for this day?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setShowHolidayWarning(false)}>
+              Cancel
+            </Button>
+            <Button onClick={performSave}>
+              Yes, I worked
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

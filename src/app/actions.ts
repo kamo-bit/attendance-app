@@ -3,7 +3,7 @@
 import { db } from "@/db"
 import * as schema from "@/db/schema"
 import { attendanceRecords, salarySettings, verifications, users, accounts } from "@/db/schema"
-import { eq, and, gte, lte, desc } from "drizzle-orm"
+import { eq, and, gte, lte, desc, ne } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
@@ -67,6 +67,7 @@ export async function saveAttendance(data: any) {
 
   revalidatePath('/')
   revalidatePath('/history')
+  revalidatePath('/salary-summary')
 }
 
 export async function getAttendanceHistory() {
@@ -78,13 +79,16 @@ export async function getAttendanceHistory() {
 
 export async function deleteAttendance(id: string) {
   const user = await getSession()
-  await db.delete(schema.attendanceRecords).where(
-    and(
-      eq(schema.attendanceRecords.id, id),
-      eq(schema.attendanceRecords.userId, user.id)
+  await db.update(schema.attendanceRecords)
+    .set({ status: 'deleted', updatedAt: new Date() })
+    .where(
+      and(
+        eq(schema.attendanceRecords.id, id),
+        eq(schema.attendanceRecords.userId, user.id)
+      )
     )
-  )
   revalidatePath('/history')
+  revalidatePath('/salary-summary')
 }
 
 export async function updateAttendance(id: string, data: any) {
@@ -98,6 +102,7 @@ export async function updateAttendance(id: string, data: any) {
       )
     )
   revalidatePath('/history')
+  revalidatePath('/salary-summary')
 }
 
 export async function getTodayAttendance(date: string) {
@@ -105,7 +110,8 @@ export async function getTodayAttendance(date: string) {
   const records = await db.select().from(schema.attendanceRecords).where(
     and(
       eq(schema.attendanceRecords.userId, user.id),
-      eq(schema.attendanceRecords.attendanceDate, date)
+      eq(schema.attendanceRecords.attendanceDate, date),
+      ne(schema.attendanceRecords.status, "deleted")
     )
   ).limit(1)
 
@@ -115,7 +121,12 @@ export async function getTodayAttendance(date: string) {
 export async function getLatestAttendanceRecord() {
   const user = await getSession()
   const records = await db.select().from(schema.attendanceRecords)
-    .where(eq(schema.attendanceRecords.userId, user.id))
+    .where(
+      and(
+        eq(schema.attendanceRecords.userId, user.id),
+        ne(schema.attendanceRecords.status, "deleted")
+      )
+    )
 
   if (records.length === 0) return null;
 
@@ -135,7 +146,8 @@ export async function getSalarySummary(periodStart: string, periodEnd: string) {
     and(
       eq(schema.attendanceRecords.userId, user.id),
       gte(schema.attendanceRecords.attendanceDate, periodStart),
-      lte(schema.attendanceRecords.attendanceDate, periodEnd)
+      lte(schema.attendanceRecords.attendanceDate, periodEnd),
+      ne(schema.attendanceRecords.status, "deleted")
     )
   )
 
@@ -156,7 +168,8 @@ export async function getYearlySummary(year: string) {
     and(
       eq(attendanceRecords.userId, user.id),
       gte(attendanceRecords.attendanceDate, `${year}-01-01`),
-      lte(attendanceRecords.attendanceDate, `${year}-12-31`)
+      lte(attendanceRecords.attendanceDate, `${year}-12-31`),
+      ne(attendanceRecords.status, "deleted")
     )
   )
 
@@ -256,4 +269,31 @@ export async function directResetPassword(email: string, newPassword: string) {
     console.error("Direct reset failed:", e);
     return { error: e.message || "Failed to reset password" };
   }
+}
+
+export async function getUserHolidays() {
+  const user = await getSession()
+  const userHolidays = await db.select().from(schema.holidays).where(eq(schema.holidays.userId, user.id))
+  return userHolidays.map(h => h.date)
+}
+
+export async function saveUserHolidays(dates: string[]) {
+  const user = await getSession()
+  
+  // Delete existing holidays for user
+  await db.delete(schema.holidays).where(eq(schema.holidays.userId, user.id))
+  
+  // Insert new holidays
+  if (dates.length > 0) {
+    const values = dates.map(date => ({
+      id: crypto.randomUUID(),
+      userId: user.id,
+      date
+    }))
+    await db.insert(schema.holidays).values(values)
+  }
+  
+  revalidatePath('/salary-summary')
+  revalidatePath('/')
+  return { success: true }
 }

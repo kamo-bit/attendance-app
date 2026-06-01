@@ -64,7 +64,7 @@ export const attendanceRecords = sqliteTable("attendance_records", {
   estimatedSalaryYen: integer("estimated_salary_yen").notNull().default(0),
   payrollPeriodStart: text("payroll_period_start").notNull(),
   payrollPeriodEnd: text("payroll_period_end").notNull(),
-  status: text("status").notNull().default("draft"),
+  status: text("status", { enum: ["draft", "completed", "deleted"] }).notNull().default("draft"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`(strftime('%s', 'now'))`),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`(strftime('%s', 'now'))`),
 });
@@ -76,4 +76,11 @@ export const salarySettings = sqliteTable("salary_settings", {
   effectiveFrom: text("effective_from").notNull(),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`(strftime('%s', 'now'))`),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`(strftime('%s', 'now'))`),
+});
+
+export const holidays = sqliteTable("holidays", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().references(() => users.id),
+  date: text("date").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(sql`(strftime('%s', 'now'))`),
 });
