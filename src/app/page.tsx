@@ -31,7 +31,6 @@ export default function Home() {
   const [break2To, setBreak2To] = useState("")
   const [clockOut, setClockOut] = useState("")
   
-  const [workMinutes, setWorkMinutes] = useState(0)
   const [hourlyWage, setHourlyWage] = useState(1115)
   const [isSaving, setIsSaving] = useState(false)
   const [isCompletedRecord, setIsCompletedRecord] = useState(false)
@@ -76,7 +75,6 @@ export default function Home() {
           setBreak2From(todayRecord.break2From || "")
           setBreak2To(todayRecord.break2To || "")
           setClockOut(todayRecord.clockOut || "")
-          setWorkMinutes(todayRecord.workMinutes)
           setIsCompletedRecord(todayRecord.status === "completed")
         } else {
           // Fetch the most recently inputted record to use as defaults
@@ -102,7 +100,6 @@ export default function Home() {
             setClockOut("")
           }
           
-          setWorkMinutes(0)
           setIsCompletedRecord(false)
         }
       } catch (error) {
@@ -120,22 +117,17 @@ export default function Home() {
     return (h2 * 60 + m2) - (h1 * 60 + m1)
   }
 
-  useEffect(() => {
+  const currentWorkMinutes = (() => {
     let total = 0
     if (clockIn && clockOut) {
       total = calculateMinutes(clockIn, clockOut)
-      
       if (hasBreak) {
-        if (break1From && break1To) {
-          total -= calculateMinutes(break1From, break1To)
-        }
-        if (breakCount === "2" && break2From && break2To) {
-          total -= calculateMinutes(break2From, break2To)
-        }
+        if (break1From && break1To) total -= calculateMinutes(break1From, break1To)
+        if (breakCount === "2" && break2From && break2To) total -= calculateMinutes(break2From, break2To)
       }
     }
-    setWorkMinutes(Math.max(0, total))
-  }, [clockIn, clockOut, hasBreak, breakCount, break1From, break1To, break2From, break2To])
+    return Math.max(0, total)
+  })()
 
   const handleSaveWage = async (wage: number) => {
     setHourlyWage(wage)
@@ -174,21 +166,9 @@ export default function Home() {
     setIsSaving(true)
     
     try {
-      let finalWorkMinutes = 0
-      if (clockIn && clockOut) {
-        finalWorkMinutes = calculateMinutes(clockIn, clockOut)
-        if (hasBreak) {
-          if (break1From && break1To) {
-            finalWorkMinutes -= calculateMinutes(break1From, break1To)
-          }
-          if (breakCount === "2" && break2From && break2To) {
-            finalWorkMinutes -= calculateMinutes(break2From, break2To)
-          }
-        }
-        finalWorkMinutes = Math.max(0, finalWorkMinutes)
-      }
 
-      const estimatedSalaryYen = Math.floor((finalWorkMinutes / 60) * hourlyWage)
+
+      const estimatedSalaryYen = Math.floor((currentWorkMinutes / 60) * hourlyWage)
       const period = getPayrollPeriod(attendanceDate)
       
       await saveAttendance({
@@ -201,7 +181,7 @@ export default function Home() {
         break2From: hasBreak && breakCount === "2" ? break2From : null,
         break2To: hasBreak && breakCount === "2" ? break2To : null,
         clockOut,
-        workMinutes: finalWorkMinutes,
+        workMinutes: currentWorkMinutes,
         hourlyWageYen: hourlyWage,
         estimatedSalaryYen,
         payrollPeriodStart: period.start,
@@ -220,9 +200,9 @@ export default function Home() {
     }
   }
 
-  const hours = Math.floor(workMinutes / 60)
-  const minutes = workMinutes % 60
-  const estimatedSalary = Math.floor((workMinutes / 60) * hourlyWage)
+  const hours = Math.floor(currentWorkMinutes / 60)
+  const minutes = currentWorkMinutes % 60
+  const estimatedSalary = Math.floor((currentWorkMinutes / 60) * hourlyWage)
   
   const parsedDate = attendanceDate ? parseISO(attendanceDate) : new Date()
   const displayDate = isValid(parsedDate) ? parsedDate : new Date()
