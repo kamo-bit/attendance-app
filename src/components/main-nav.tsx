@@ -23,6 +23,7 @@ export function MainNav() {
   const handleLogout = async () => {
     await authClient.signOut()
     setOpen(false)
+    setShowLogoutDialog(false)
     router.push("/login")
   }
 
