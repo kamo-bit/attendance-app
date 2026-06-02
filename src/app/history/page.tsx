@@ -77,8 +77,8 @@ export default function HistoryPage() {
   }
 
   const sortedRecords = [...records].sort((a, b) => {
-    const timeA = Math.max(normalizeTime(a.updatedAt), normalizeTime(a.createdAt), new Date(a.attendanceDate).getTime())
-    const timeB = Math.max(normalizeTime(b.updatedAt), normalizeTime(b.createdAt), new Date(b.attendanceDate).getTime())
+    const timeA = Math.max(normalizeTime(a.updatedAt), normalizeTime(a.createdAt))
+    const timeB = Math.max(normalizeTime(b.updatedAt), normalizeTime(b.createdAt))
     return timeB - timeA
   })
 
