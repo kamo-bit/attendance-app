@@ -156,7 +156,8 @@ export default function HistoryPage() {
                                 const updatedTime = normalizeTime(record.updatedAt);
                                 const isDeleted = record.status === "deleted";
                                 const isEdited = updatedTime > createdTime + 1000;
-                                const actionDate = new Date(Math.max(updatedTime, createdTime, new Date(record.attendanceDate).getTime()));
+                                const maxTime = Math.max(updatedTime, createdTime);
+                                const actionDate = maxTime > 0 ? new Date(maxTime) : new Date(record.attendanceDate);
                                 
                                 return (
                                   <div className="flex flex-col items-end text-xs text-muted-foreground whitespace-nowrap">
