@@ -7,6 +7,14 @@ import { Resend } from 'resend';
 import { render } from '@react-email/render';
 import SalarySummaryEmail from '@/components/emails/salary-summary-email';
 
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+function formatMinutes(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${h}h ${m}m`;
+}
+
 export async function GET(request: Request) {
   // Initialize Resend with the API key from environment variables
   const resend = new Resend(process.env.RESEND_API_KEY);
@@ -21,22 +29,22 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Determine the payroll period. If today is the 21st, 
+    // Determine the payroll period. If today is the 21st,
     // the period we are reporting on ended on the 20th.
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const dateStr = yesterday.toISOString();
-    
+
     const { start, end } = getPayrollPeriod(dateStr);
-    
+
     // Fetch all users
     const allUsers = await db.select().from(users);
     let sentCount = 0;
-    
+
     for (const user of allUsers) {
       if (!user.email) continue;
-      
-      // Fetch user's attendance for the calculated period
+
+      // Fetch user's attendance for the calculated period, sorted by date
       const records = await db.select().from(attendanceRecords)
         .where(
           and(
@@ -45,55 +53,84 @@ export async function GET(request: Request) {
             lte(attendanceRecords.attendanceDate, end)
           )
         );
-        
+
       if (records.length === 0) continue; // Skip users with no records this period
-      
+
       let totalWorkMinutes = 0;
       let totalSalaryYen = 0;
       let totalWorkDays = 0;
-      
-      for (const record of records) {
-        if (record.clockIn) {
+
+      // Sort records by date ascending
+      const sortedRecords = [...records].sort((a, b) =>
+        a.attendanceDate.localeCompare(b.attendanceDate)
+      );
+
+      // Build per-day rows for the table
+      const dailyRows = sortedRecords
+        .filter(r => r.clockIn) // only days with clock-in
+        .map(r => {
+          const date = new Date(r.attendanceDate);
+          const dayName = DAY_NAMES[date.getDay()];
+
+          // Build break time string
+          let breakTime = '—';
+          if (r.hasBreak && r.break1From && r.break1To) {
+            breakTime = `${r.break1From}–${r.break1To}`;
+            if (r.breakCount === 2 && r.break2From && r.break2To) {
+              breakTime += `, ${r.break2From}–${r.break2To}`;
+            }
+          }
+
           totalWorkDays++;
-          totalWorkMinutes += record.workMinutes || 0;
-          totalSalaryYen += record.estimatedSalaryYen || 0;
-        }
-      }
-      
+          totalWorkMinutes += r.workMinutes || 0;
+          totalSalaryYen += r.estimatedSalaryYen || 0;
+
+          return {
+            date: r.attendanceDate,
+            dayName,
+            clockIn: r.clockIn || '',
+            clockOut: r.clockOut || '',
+            breakTime,
+            workHours: formatMinutes(r.workMinutes || 0),
+            salary: `¥${(r.estimatedSalaryYen || 0).toLocaleString()}`,
+          };
+        });
+
       const hours = Math.floor(totalWorkMinutes / 60);
       const minutes = totalWorkMinutes % 60;
-      const periodLabel = `${start} to ${end}`;
-      
+      const periodLabel = `${start} ~ ${end}`;
+
       const emailHtml = await render(
         SalarySummaryEmail({
           userName: user.name || 'User',
           period: periodLabel,
           totalWorkHours: `${hours}h ${minutes}m`,
           totalWorkDays,
-          totalSalary: `¥${totalSalaryYen.toLocaleString()}`
+          totalSalary: `¥${totalSalaryYen.toLocaleString()}`,
+          records: dailyRows,
         })
       );
-      
+
       // Send the email summary
       await resend.emails.send({
         from: 'Admin Absensi <admin@absenkuy.cc>',
         to: user.email,
-        subject: `Your Salary Summary for ${periodLabel}`,
-        html: emailHtml
+        subject: `Salary Summary — ${periodLabel}`,
+        html: emailHtml,
       });
       sentCount++;
     }
-    
-    return NextResponse.json({ 
-      success: true, 
+
+    return NextResponse.json({
+      success: true,
       message: `Emails sent successfully for period ${start} to ${end}`,
-      sentCount 
+      sentCount,
     });
   } catch (error) {
     console.error('Error sending salary emails:', error);
-    return NextResponse.json({ 
-      success: false, 
-      error: 'Internal Server Error' 
+    return NextResponse.json({
+      success: false,
+      error: 'Internal Server Error',
     }, { status: 500 });
   }
 }
