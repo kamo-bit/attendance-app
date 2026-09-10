@@ -205,7 +205,7 @@ export const SalarySummaryEmail = ({
         <div className="wrapper">
           {/* Header */}
           <div className="header">
-            <h1>📋 Salary Summary</h1>
+            <h1>📋 Gajimu sasi iki cokkk!!!</h1>
             <p>Payroll Period: {period}</p>
           </div>
 
@@ -213,8 +213,8 @@ export const SalarySummaryEmail = ({
           <div className="card">
             <p className="greeting">
               Hi <strong>{userName}</strong>,<br />
-              Here is your detailed salary summary for the payroll period <strong>{period}</strong>.
-              You can save this email as PDF by clicking the button below.
+              Total gajimu sasi iki cokkk!!! <strong>{period}</strong>.
+              Save aja kalo butuh.
             </p>
 
             {/* Summary Boxes */}
