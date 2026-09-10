@@ -129,4 +129,31 @@
   html {
     @apply font-sans;
   }
+
+  /* Safari WebKit fix: prevent date/time inputs from collapsing */
+  input[type="time"],
+  input[type="date"] {
+    -webkit-appearance: none;
+    appearance: none;
+    display: flex;
+    align-items: center;
+    min-height: 2.5rem;
+  }
+
+  input[type="time"]::-webkit-date-and-time-value,
+  input[type="date"]::-webkit-date-and-time-value {
+    text-align: left;
+  }
+
+  input[type="time"]::-webkit-datetime-edit,
+  input[type="date"]::-webkit-datetime-edit {
+    padding: 0;
+    display: flex;
+    align-items: center;
+  }
+
+  input[type="time"]::-webkit-datetime-edit-fields-wrapper,
+  input[type="date"]::-webkit-datetime-edit-fields-wrapper {
+    padding: 0;
+  }
 }

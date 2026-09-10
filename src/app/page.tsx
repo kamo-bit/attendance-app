@@ -257,7 +257,7 @@ export default function Home() {
                     type="date"
                     value={attendanceDate}
                     onChange={(e) => setAttendanceDate(e.target.value)}
-                    className="w-full sm:max-w-[220px] h-12 text-lg rounded-xl bg-background"
+                    className="w-full sm:max-w-[220px] h-12 min-h-[3rem] text-lg rounded-xl bg-background [&::-webkit-date-and-time-value]:text-left [&::-webkit-datetime-edit]:p-0"
                   />
                   <span className="text-sm text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-lg border">You can log past dates here.</span>
                 </div>
@@ -274,7 +274,7 @@ export default function Home() {
                     type="time" 
                     value={clockIn}
                     onChange={(e) => setClockIn(e.target.value)}
-                    className="h-14 text-2xl font-medium rounded-xl border-emerald-500/30 focus-visible:ring-emerald-500 bg-background/80 backdrop-blur-sm"
+                    className="h-14 min-h-[3.5rem] text-2xl font-medium rounded-xl border-emerald-500/30 focus-visible:ring-emerald-500 bg-background/80 backdrop-blur-sm [&::-webkit-date-and-time-value]:text-left [&::-webkit-datetime-edit]:p-0 [&::-webkit-datetime-edit-fields-wrapper]:p-0"
                   />
                 </div>
                 <div className="space-y-3 bg-rose-500/5 p-5 rounded-2xl border border-rose-500/20 transition-all hover:shadow-md">
@@ -286,7 +286,7 @@ export default function Home() {
                     type="time" 
                     value={clockOut}
                     onChange={(e) => setClockOut(e.target.value)}
-                    className="h-14 text-2xl font-medium rounded-xl border-rose-500/30 focus-visible:ring-rose-500 bg-background/80 backdrop-blur-sm"
+                    className="h-14 min-h-[3.5rem] text-2xl font-medium rounded-xl border-rose-500/30 focus-visible:ring-rose-500 bg-background/80 backdrop-blur-sm [&::-webkit-date-and-time-value]:text-left [&::-webkit-datetime-edit]:p-0 [&::-webkit-datetime-edit-fields-wrapper]:p-0"
                   />
                 </div>
               </div>
