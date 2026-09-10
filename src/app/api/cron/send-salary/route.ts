@@ -7,10 +7,10 @@ import { Resend } from 'resend';
 import { render } from '@react-email/render';
 import SalarySummaryEmail from '@/components/emails/salary-summary-email';
 
-// Initialize Resend with the API key from environment variables
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 export async function GET(request: Request) {
+  // Initialize Resend with the API key from environment variables
+  const resend = new Resend(process.env.RESEND_API_KEY);
+
   // Check for the cron secret to secure the route
   const authHeader = request.headers.get('authorization');
   if (
