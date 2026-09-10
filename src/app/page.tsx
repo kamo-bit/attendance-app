@@ -225,8 +225,8 @@ export default function Home() {
           <Card className="rounded-2xl shadow-sm border overflow-hidden transition-all duration-300 hover:shadow-md">
             <CardHeader className="bg-primary/5 pb-8 pt-8">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <CardTitle className="flex items-center gap-2">
-                  <CalendarIcon className="w-5 h-5 text-primary" />
+                <CardTitle className="flex items-center gap-2 text-2xl">
+                  <CalendarIcon className="w-6 h-6 text-primary" />
                   Clock In / Out
                 </CardTitle>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
@@ -247,54 +247,56 @@ export default function Home() {
             <CardContent className="space-y-8 pt-6">
               
               {/* Date Input */}
-              <div className="space-y-3">
-                <Label htmlFor="date-input" className="text-base font-semibold">Log Date</Label>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:space-x-2">
+              <div className="space-y-3 bg-card p-5 rounded-2xl border shadow-sm transition-all hover:shadow-md">
+                <Label htmlFor="date-input" className="text-base font-semibold flex items-center gap-2">
+                  <CalendarIcon className="w-4 h-4 text-primary" /> Log Date
+                </Label>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
                   <Input 
                     id="date-input"
                     type="date"
                     value={attendanceDate}
                     onChange={(e) => setAttendanceDate(e.target.value)}
-                    className="w-full sm:max-w-[200px]"
+                    className="w-full sm:max-w-[220px] h-12 text-lg rounded-xl bg-background"
                   />
-                  <span className="text-sm text-muted-foreground sm:ml-2">You can log past dates here.</span>
+                  <span className="text-sm text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-lg border">You can log past dates here.</span>
                 </div>
               </div>
 
               {/* Time Inputs */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div className="space-y-3">
-                  <Label htmlFor="in" className="text-base font-semibold flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-emerald-500" /> Time In
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                <div className="space-y-3 bg-emerald-500/5 p-5 rounded-2xl border border-emerald-500/20 transition-all hover:shadow-md">
+                  <Label htmlFor="in" className="text-base font-bold flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+                    <Clock className="w-5 h-5" /> Time In
                   </Label>
                   <Input 
                     id="in" 
                     type="time" 
                     value={clockIn}
                     onChange={(e) => setClockIn(e.target.value)}
-                    className="h-12 text-lg"
+                    className="h-14 text-2xl font-medium rounded-xl border-emerald-500/30 focus-visible:ring-emerald-500 bg-background/80 backdrop-blur-sm"
                   />
                 </div>
-                <div className="space-y-3">
-                  <Label htmlFor="out" className="text-base font-semibold flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-rose-500" /> Time Out
+                <div className="space-y-3 bg-rose-500/5 p-5 rounded-2xl border border-rose-500/20 transition-all hover:shadow-md">
+                  <Label htmlFor="out" className="text-base font-bold flex items-center gap-2 text-rose-700 dark:text-rose-400">
+                    <Clock className="w-5 h-5" /> Time Out
                   </Label>
                   <Input 
                     id="out" 
                     type="time" 
                     value={clockOut}
                     onChange={(e) => setClockOut(e.target.value)}
-                    className="h-12 text-lg"
+                    className="h-14 text-2xl font-medium rounded-xl border-rose-500/30 focus-visible:ring-rose-500 bg-background/80 backdrop-blur-sm"
                   />
                 </div>
               </div>
 
               {/* Breaks Section */}
-              <div className="rounded-xl border bg-card p-6 shadow-sm">
+              <div className="rounded-2xl border bg-card p-6 shadow-sm transition-all hover:shadow-md">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                   <div className="space-y-1">
                     <Label htmlFor="break-switch" className="text-base font-semibold flex items-center gap-2">
-                      <Coffee className="w-4 h-4 text-amber-500" /> Take a break?
+                      <Coffee className="w-5 h-5 text-amber-500" /> Take a break?
                     </Label>
                     <p className="text-sm text-muted-foreground">Toggle if you had resting periods.</p>
                   </div>
@@ -302,44 +304,44 @@ export default function Home() {
                     id="break-switch" 
                     checked={hasBreak}
                     onCheckedChange={setHasBreak}
-                    className="self-start sm:self-auto"
+                    className="self-start sm:self-auto scale-110"
                   />
                 </div>
 
                 {hasBreak && (
-                  <div className="space-y-6 pt-4 border-t animate-in fade-in slide-in-from-top-4 duration-300">
-                    <RadioGroup 
-                      value={breakCount} 
-                      onValueChange={(val) => setBreakCount(val as "1" | "2")}
-                      className="flex space-x-4"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="1" id="r1" />
-                        <Label htmlFor="r1">1 Break</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="2" id="r2" />
-                        <Label htmlFor="r2">2 Breaks</Label>
-                      </div>
-                    </RadioGroup>
+                  <div className="space-y-6 pt-6 border-t animate-in fade-in slide-in-from-top-4 duration-300">
+                    <div className="flex p-1 bg-muted/50 rounded-xl w-fit">
+                      <button
+                        onClick={() => setBreakCount("1")}
+                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${breakCount === "1" ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                      >
+                        1 Break
+                      </button>
+                      <button
+                        onClick={() => setBreakCount("2")}
+                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${breakCount === "2" ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                      >
+                        2 Breaks
+                      </button>
+                    </div>
 
                     <div className="space-y-4">
-                      <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between bg-muted/50 p-4 rounded-lg">
-                        <div className="text-sm font-medium shrink-0">Break 1</div>
-                        <div className="flex flex-col min-[400px]:flex-row items-center gap-2 w-full sm:w-auto flex-1 sm:max-w-[320px]">
-                          <Input type="time" value={break1From} onChange={(e) => setBreak1From(e.target.value)} className="h-9 flex-1 w-full" />
+                      <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between bg-amber-500/5 border border-amber-500/20 p-5 rounded-2xl">
+                        <div className="text-sm font-bold text-amber-700 dark:text-amber-500 shrink-0">Break 1</div>
+                        <div className="flex flex-col min-[400px]:flex-row items-center gap-3 w-full sm:w-auto flex-1 sm:max-w-[340px]">
+                          <Input type="time" value={break1From} onChange={(e) => setBreak1From(e.target.value)} className="h-12 text-lg rounded-xl bg-background flex-1 w-full" />
                           <span className="text-muted-foreground shrink-0 text-sm hidden min-[400px]:inline">to</span>
-                          <Input type="time" value={break1To} onChange={(e) => setBreak1To(e.target.value)} className="h-9 flex-1 w-full" />
+                          <Input type="time" value={break1To} onChange={(e) => setBreak1To(e.target.value)} className="h-12 text-lg rounded-xl bg-background flex-1 w-full" />
                         </div>
                       </div>
                       
                       {breakCount === "2" && (
-                        <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between bg-muted/50 p-4 rounded-lg animate-in fade-in zoom-in duration-300">
-                          <div className="text-sm font-medium shrink-0">Break 2</div>
-                          <div className="flex flex-col min-[400px]:flex-row items-center gap-2 w-full sm:w-auto flex-1 sm:max-w-[320px]">
-                            <Input type="time" value={break2From} onChange={(e) => setBreak2From(e.target.value)} className="h-9 flex-1 w-full" />
+                        <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between bg-amber-500/5 border border-amber-500/20 p-5 rounded-2xl animate-in fade-in zoom-in duration-300">
+                          <div className="text-sm font-bold text-amber-700 dark:text-amber-500 shrink-0">Break 2</div>
+                          <div className="flex flex-col min-[400px]:flex-row items-center gap-3 w-full sm:w-auto flex-1 sm:max-w-[340px]">
+                            <Input type="time" value={break2From} onChange={(e) => setBreak2From(e.target.value)} className="h-12 text-lg rounded-xl bg-background flex-1 w-full" />
                             <span className="text-muted-foreground shrink-0 text-sm hidden min-[400px]:inline">to</span>
-                            <Input type="time" value={break2To} onChange={(e) => setBreak2To(e.target.value)} className="h-9 flex-1 w-full" />
+                            <Input type="time" value={break2To} onChange={(e) => setBreak2To(e.target.value)} className="h-12 text-lg rounded-xl bg-background flex-1 w-full" />
                           </div>
                         </div>
                       )}
@@ -374,31 +376,36 @@ export default function Home() {
 
         {/* Summary Column */}
         <div className="space-y-6">
-          <Card className="rounded-2xl border-none bg-gradient-to-br from-primary/10 via-primary/5 to-background shadow-md">
-            <CardHeader>
-              <CardTitle>Daily Summary</CardTitle>
+          <Card className="rounded-3xl border-none bg-gradient-to-br from-primary/15 via-primary/5 to-background shadow-lg overflow-hidden relative">
+            <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+              <Clock className="w-32 h-32" />
+            </div>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-2xl">Daily Summary</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-8">
-              <div className="space-y-2">
-                <div className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total Work Time</div>
-                <div className="text-4xl font-bold flex items-baseline gap-1">
-                  {hours}<span className="text-xl font-semibold text-muted-foreground">h</span> {minutes}<span className="text-xl font-semibold text-muted-foreground">m</span>
+            <CardContent className="space-y-8 relative z-10">
+              <div className="space-y-2 p-5 bg-background/50 backdrop-blur rounded-2xl border shadow-sm">
+                <div className="text-sm font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                  <Clock className="w-4 h-4" /> Total Work Time
+                </div>
+                <div className="text-5xl font-black flex items-baseline gap-1 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                  {hours}<span className="text-2xl font-bold text-muted-foreground">h</span> {minutes}<span className="text-2xl font-bold text-muted-foreground">m</span>
                 </div>
               </div>
               
-              <div className="space-y-2">
-                <div className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Estimated Salary</div>
-                <div className="text-3xl font-bold text-primary">
+              <div className="space-y-2 p-5 bg-primary/10 rounded-2xl border border-primary/20 shadow-sm">
+                <div className="text-sm font-bold text-primary/80 uppercase tracking-wider">Estimated Salary</div>
+                <div className="text-4xl font-black text-primary drop-shadow-sm">
                   ¥{estimatedSalary.toLocaleString()}
                 </div>
-                <div className="flex items-center gap-2 mt-1">
-                  <Label htmlFor="wage-input" className="text-xs text-muted-foreground whitespace-nowrap">Wage (¥/hr):</Label>
+                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-primary/10">
+                  <Label htmlFor="wage-input" className="text-sm font-medium text-primary/80 whitespace-nowrap">Base Wage (¥/hr):</Label>
                   <Input 
                     id="wage-input"
                     type="number"
                     value={hourlyWage || ""}
                     onChange={(e) => handleSaveWage(Number(e.target.value))}
-                    className="h-7 w-24 px-2 py-1 text-xs bg-background/50"
+                    className="h-9 w-24 px-3 py-1 font-bold bg-background shadow-inner rounded-lg border-primary/20"
                   />
                 </div>
               </div>

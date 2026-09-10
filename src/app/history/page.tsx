@@ -98,19 +98,19 @@ export default function HistoryPage() {
       <div className="space-y-8">
         {sortedRecords.length > 0 && (
           <div className="space-y-4">
-            <Card className="rounded-2xl border shadow-sm overflow-hidden">
+            <Card className="rounded-3xl border-primary/10 shadow-sm overflow-hidden bg-card/50 backdrop-blur-sm">
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Clock In</TableHead>
-                        <TableHead>Clock Out</TableHead>
-                        <TableHead>Breaks</TableHead>
-                        <TableHead className="text-right">Work Hours</TableHead>
-                        <TableHead className="text-right">Salary</TableHead>
-                        <TableHead className="text-right">Status / Time</TableHead>
+                    <TableHeader className="bg-muted/30">
+                      <TableRow className="hover:bg-transparent border-b-primary/10">
+                        <TableHead className="py-4 px-6 font-semibold">Date</TableHead>
+                        <TableHead className="py-4 font-semibold">Clock In</TableHead>
+                        <TableHead className="py-4 font-semibold">Clock Out</TableHead>
+                        <TableHead className="py-4 font-semibold">Breaks</TableHead>
+                        <TableHead className="py-4 text-right font-semibold">Work Hours</TableHead>
+                        <TableHead className="py-4 text-right font-semibold">Salary</TableHead>
+                        <TableHead className="py-4 px-6 text-right font-semibold">Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -125,32 +125,32 @@ export default function HistoryPage() {
                         }
 
                         return (
-                          <TableRow key={record.id} className={record.status === "deleted" ? "opacity-60 bg-muted/30" : ""}>
-                            <TableCell className={`font-medium whitespace-nowrap ${record.status === "deleted" ? "line-through text-muted-foreground" : ""}`}>
+                          <TableRow key={record.id} className={`group hover:bg-muted/30 transition-colors ${record.status === "deleted" ? "opacity-60 bg-muted/20" : ""}`}>
+                            <TableCell className={`py-4 px-6 font-medium whitespace-nowrap ${record.status === "deleted" ? "line-through text-muted-foreground" : ""}`}>
                               {format(parseISO(record.attendanceDate), "MMM d, yyyy")}
                             </TableCell>
-                            <TableCell className={record.status === "deleted" ? "line-through text-muted-foreground" : ""}>{record.clockIn || "-"}</TableCell>
-                            <TableCell className={record.status === "deleted" ? "line-through text-muted-foreground" : ""}>{record.clockOut || "-"}</TableCell>
-                            <TableCell className={record.status === "deleted" ? "line-through opacity-50" : ""}>
+                            <TableCell className={`py-4 ${record.status === "deleted" ? "line-through text-muted-foreground" : ""}`}>{record.clockIn || "-"}</TableCell>
+                            <TableCell className={`py-4 ${record.status === "deleted" ? "line-through text-muted-foreground" : ""}`}>{record.clockOut || "-"}</TableCell>
+                            <TableCell className={`py-4 ${record.status === "deleted" ? "line-through opacity-50" : ""}`}>
                               {!record.hasBreak || record.breakCount === 0 ? (
-                                <span className="text-muted-foreground">-</span>
+                                <span className="text-muted-foreground/50 italic">-</span>
                               ) : (
-                                <div className="flex flex-col gap-1 text-xs">
+                                <div className="flex flex-col gap-1.5 text-xs">
                                   {breaksList.map((b, i) => (
-                                    <span key={i} className="bg-secondary text-secondary-foreground px-2 py-0.5 rounded-md w-max border">
+                                    <span key={i} className="bg-amber-500/10 text-amber-700 dark:text-amber-400 font-medium px-2.5 py-1 rounded-md w-max border border-amber-500/20">
                                       {b}
                                     </span>
                                   ))}
                                 </div>
                               )}
                             </TableCell>
-                            <TableCell className={`text-right whitespace-nowrap ${record.status === "deleted" ? "line-through text-muted-foreground" : ""}`}>
-                              {hours}h {mins}m
+                            <TableCell className={`py-4 text-right whitespace-nowrap ${record.status === "deleted" ? "line-through text-muted-foreground" : "font-semibold"}`}>
+                              {hours}<span className="text-muted-foreground/70 text-xs mr-1">h</span>{mins}<span className="text-muted-foreground/70 text-xs">m</span>
                             </TableCell>
-                            <TableCell className={`text-right font-medium ${record.status === "deleted" ? "line-through text-muted-foreground" : "text-primary"}`}>
+                            <TableCell className={`py-4 text-right font-bold ${record.status === "deleted" ? "line-through text-muted-foreground" : "text-primary"}`}>
                               ¥{(record.estimatedSalaryYen || 0).toLocaleString()}
                             </TableCell>
-                            <TableCell className="text-right">
+                            <TableCell className="py-4 px-6 text-right">
                               {(() => {
                                 const createdTime = normalizeTime(record.createdAt);
                                 const updatedTime = normalizeTime(record.updatedAt);
@@ -160,11 +160,11 @@ export default function HistoryPage() {
                                 const actionDate = maxTime > 0 ? new Date(maxTime) : new Date(record.attendanceDate);
                                 
                                 return (
-                                  <div className="flex flex-col items-end text-xs text-muted-foreground whitespace-nowrap">
-                                    <span className={isDeleted ? "text-rose-500 font-bold" : (isEdited ? "text-amber-500 font-medium" : "text-emerald-500 font-medium")}>
+                                  <div className="flex flex-col items-end gap-1 whitespace-nowrap">
+                                    <span className={`text-[11px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full ${isDeleted ? "bg-rose-500/15 text-rose-600 dark:text-rose-400" : (isEdited ? "bg-amber-500/15 text-amber-600 dark:text-amber-400" : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400")}`}>
                                       {isDeleted ? "Deleted" : (isEdited ? "Edited" : "Created")}
                                     </span>
-                                    <span>{format(actionDate, "MMM d, HH:mm")}</span>
+                                    <span className="text-xs text-muted-foreground">{format(actionDate, "MMM d, HH:mm")}</span>
                                   </div>
                                 )
                               })()}

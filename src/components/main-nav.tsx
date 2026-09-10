@@ -34,22 +34,24 @@ export function MainNav() {
   ]
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 items-center px-4 md:px-8 max-w-screen-2xl mx-auto">
+    <header className="sticky top-0 z-50 w-full border-b border-primary/10 bg-background/70 backdrop-blur-xl shadow-sm transition-all duration-300">
+      <div className="container flex h-16 items-center px-4 md:px-8 max-w-screen-2xl mx-auto">
         <div className="mr-4 hidden md:flex">
           <Link href="/" className="mr-6 flex items-center space-x-2">
             <span className="hidden font-bold sm:inline-block">
               Attendance App
             </span>
           </Link>
-          <nav className="flex items-center space-x-6 text-sm font-medium">
+          <nav className="flex items-center space-x-6 text-sm font-semibold tracking-wide">
             {(!isPending && session) && navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 className={cn(
-                  "transition-colors hover:text-foreground/80",
-                  pathname === link.href ? "text-foreground" : "text-foreground/60"
+                  "relative py-1 transition-colors hover:text-primary",
+                  pathname === link.href ? "text-primary" : "text-muted-foreground",
+                  "after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-full after:origin-bottom-right after:scale-x-0 after:bg-primary after:transition-transform after:duration-300 hover:after:origin-bottom-left hover:after:scale-x-100",
+                  pathname === link.href && "after:scale-x-100 after:origin-bottom-left"
                 )}
               >
                 {link.label}
@@ -78,8 +80,8 @@ export function MainNav() {
                       href={link.href}
                       onClick={() => setOpen(false)}
                       className={cn(
-                        "text-base transition-colors hover:text-foreground/80",
-                        pathname === link.href ? "text-foreground font-medium" : "text-foreground/60"
+                        "text-base transition-colors hover:text-primary px-2 py-1.5 rounded-md",
+                        pathname === link.href ? "text-primary font-bold bg-primary/10" : "text-muted-foreground font-medium"
                       )}
                     >
                       {link.label}
@@ -137,7 +139,7 @@ export function MainNav() {
                 </Button>
               </div>
             ) : (
-              <Link href="/login" className="hidden md:inline-flex text-sm font-medium hover:underline px-2 py-1">
+              <Link href="/login" className="hidden md:inline-flex text-sm font-bold bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-xl transition-all shadow-sm">
                 Login
               </Link>
             )}

@@ -41,18 +41,13 @@ export function getPayrollPeriod(dateStr: string) {
 }
 
 export function getSalaryPeriodForMonth(dateStr: string) {
-  // If the user selects "May" (e.g., "2026-05-xx"), the May Salary covers the period from March 21 to April 20.
-  // We parse it manually to avoid JavaScript Date overflow issues (e.g., April 31).
+  // If the user selects "May" (e.g., "2026-05-xx"), the May Salary covers the period from April 21 to May 20.
   const [y, mStr] = dateStr.split('T')[0].split('-')
   const yNum = Number(y)
   const mNum = Number(mStr) // 1-indexed month
   
-  let endMonth = mNum - 1
+  let endMonth = mNum
   let endYear = yNum
-  if (endMonth < 1) {
-    endMonth += 12
-    endYear--
-  }
   
   let startMonth = endMonth - 1
   let startYear = endYear

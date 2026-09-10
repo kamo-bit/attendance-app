@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { format, parseISO, subMonths, addMonths, eachDayOfInterval, startOfWeek, endOfWeek, isSameMonth } from "date-fns"
-import { FileText, CalendarRange, BarChart3, CalendarDays, MousePointerClick, Banknote, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Download, Edit, Trash2 } from "lucide-react"
+import { FileText, CalendarRange, BarChart3, CalendarDays, MousePointerClick, Banknote, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Download, Edit, Trash2, Clock } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -46,8 +46,6 @@ export default function SalarySummaryPage() {
 
   const [isMobile, setIsMobile] = useState(false)
   const [calendarMonth, setCalendarMonth] = useState<Date | null>(null)
-  const [isExporting, setIsExporting] = useState(false)
-  const chartRef = useRef<HTMLDivElement>(null)
 
   const [isSelectingHolidays, setIsSelectingHolidays] = useState(false)
   const [selectedHolidays, setSelectedHolidays] = useState<string[]>([])
@@ -150,18 +148,6 @@ export default function SalarySummaryPage() {
 
   // Chart data for monthly (Daily Salary) - Based on the precise payroll period
   const allDaysInPeriod = eachDayOfInterval({ start: pStart, end: pEnd })
-  const monthlyChartData = allDaysInPeriod.map(day => {
-    const dateStr = format(day, "yyyy-MM-dd")
-    // Find record in the active period first, then fallback to yearly summary records
-    const record = summary.records?.find(r => r.attendanceDate === dateStr) ||
-                   yearlySummary.records?.find(r => r.attendanceDate === dateStr)
-    return {
-      date: format(day, "d/M"), // e.g. '21/3', '1/4' to prevent overlapping text
-      fullDate: format(day, "MMMM d, yyyy"),
-      salary: record ? record.estimatedSalaryYen : 0,
-      day: dateStr
-    }
-  })
 
   // --- Yearly Calculation ---
   const yHours = Math.floor(yearlySummary.totalWorkMinutes / 60)
@@ -340,196 +326,6 @@ export default function SalarySummaryPage() {
     )
   }
 
-  const handleExportPDF = async () => {
-    setIsExporting(true)
-    try {
-      const { default: jsPDF } = await import('jspdf')
-      const { default: html2canvas } = await import('html2canvas-pro')
-      
-      const doc = new jsPDF('p', 'mm', 'a4')
-      const pageWidth = doc.internal.pageSize.getWidth()
-      const margin = 15
-      const contentWidth = pageWidth - margin * 2
-      let y = margin
-
-      // Salary month label (e.g. "May 2026 Salary Report")
-      const selectedDate = parseISO(periodDate)
-      const salaryMonthLabel = format(selectedDate, "MMMM yyyy")
-
-      // Title
-      doc.setFontSize(20)
-      doc.setFont('helvetica', 'bold')
-      doc.text(`${salaryMonthLabel} - Salary Report`, margin, y)
-      y += 10
-
-      // Period info
-      doc.setFontSize(11)
-      doc.setFont('helvetica', 'normal')
-      doc.setTextColor(100)
-      doc.text(`Payroll Period: ${format(pStart, "MMM d, yyyy")} — ${format(pEnd, "MMM d, yyyy")}`, margin, y)
-      y += 6
-      doc.text(`Generated: ${format(new Date(), "MMM d, yyyy HH:mm")}`, margin, y)
-      y += 10
-
-      // Divider
-      doc.setDrawColor(200)
-      doc.line(margin, y, pageWidth - margin, y)
-      y += 8
-
-      // Summary box
-      doc.setFillColor(245, 247, 250)
-      doc.roundedRect(margin, y, contentWidth, 28, 3, 3, 'F')
-      
-      doc.setTextColor(60)
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'normal')
-      doc.text('Total Work Time', margin + 8, y + 8)
-      doc.text('Days Worked', margin + 8 + contentWidth / 3, y + 8)
-      doc.text('Total Salary', margin + 8 + (contentWidth / 3) * 2, y + 8)
-      
-      doc.setTextColor(30)
-      doc.setFontSize(16)
-      doc.setFont('helvetica', 'bold')
-      doc.text(`${hours}h ${minutes}m`, margin + 8, y + 20)
-      doc.text(`${summary.totalWorkDays} days`, margin + 8 + contentWidth / 3, y + 20)
-      doc.text(`\u00a5${summary.totalSalaryYen.toLocaleString()}`, margin + 8 + (contentWidth / 3) * 2, y + 20)
-      y += 36
-
-      // Section: Work Day Details
-      doc.setTextColor(30)
-      doc.setFontSize(13)
-      doc.setFont('helvetica', 'bold')
-      doc.text('Work Day Details', margin, y)
-      y += 2
-
-      doc.setFontSize(9)
-      doc.setFont('helvetica', 'normal')
-      doc.setTextColor(120)
-      doc.text(`Period: ${format(pStart, "MMM d")} — ${format(pEnd, "MMM d, yyyy")}`, margin, y + 5)
-      y += 10
-
-      // Table header
-      doc.setFillColor(30, 41, 59)
-      doc.roundedRect(margin, y, contentWidth, 10, 2, 2, 'F')
-      doc.setTextColor(255)
-      doc.setFontSize(9)
-      doc.setFont('helvetica', 'bold')
-      const colWidths = [contentWidth * 0.06, contentWidth * 0.21, contentWidth * 0.15, contentWidth * 0.15, contentWidth * 0.18, contentWidth * 0.25]
-      const headers = ['#', 'Date', 'Clock In', 'Clock Out', 'Work Time', 'Salary']
-      let xPos = margin
-      headers.forEach((h, i) => {
-        doc.text(h, xPos + 3, y + 7)
-        xPos += colWidths[i]
-      })
-      y += 12
-
-      // Table rows — all days from the payroll period
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(9)
-      
-      const tableRecords = allDaysInPeriod.map(day => {
-        const dateStr = format(day, "yyyy-MM-dd")
-        const record = summary.records?.find(r => r.attendanceDate === dateStr) ||
-                       yearlySummary.records?.find(r => r.attendanceDate === dateStr)
-        return {
-          attendanceDate: dateStr,
-          clockIn: record?.clockIn || '-',
-          clockOut: record?.clockOut || '-',
-          workMinutes: record?.workMinutes || 0,
-          estimatedSalaryYen: record?.estimatedSalaryYen || 0
-        }
-      })
-      
-      tableRecords.forEach((record: any, idx: number) => {
-        if (y > 270) {
-          doc.addPage()
-          y = margin
-          // Re-draw table header on new page
-          doc.setFillColor(30, 41, 59)
-          doc.roundedRect(margin, y, contentWidth, 10, 2, 2, 'F')
-          doc.setTextColor(255)
-          doc.setFontSize(9)
-          doc.setFont('helvetica', 'bold')
-          xPos = margin
-          headers.forEach((h, i) => {
-            doc.text(h, xPos + 3, y + 7)
-            xPos += colWidths[i]
-          })
-          y += 12
-          doc.setFont('helvetica', 'normal')
-          doc.setFontSize(9)
-        }
-        
-        const bgColor = idx % 2 === 0 ? [255, 255, 255] : [248, 250, 252]
-        doc.setFillColor(bgColor[0], bgColor[1], bgColor[2])
-        doc.rect(margin, y - 4, contentWidth, 9, 'F')
-        
-        doc.setTextColor(50)
-        const rHours = Math.floor(record.workMinutes / 60)
-        const rMins = record.workMinutes % 60
-        const rowData = [
-          `${idx + 1}`,
-          format(parseISO(record.attendanceDate), "MMM d, yyyy"),
-          record.clockIn,
-          record.clockOut,
-          record.workMinutes > 0 ? `${rHours}h ${rMins}m` : '-',
-          record.estimatedSalaryYen > 0 ? `\u00a5${record.estimatedSalaryYen.toLocaleString()}` : '-'
-        ]
-        xPos = margin
-        rowData.forEach((cell, i) => {
-          doc.text(cell, xPos + 3, y + 2)
-          xPos += colWidths[i]
-        })
-        y += 9
-      })
-
-      // Total row at bottom of table
-      const workedDaysCount = tableRecords.filter(r => r.clockIn !== '-').length
-      if (workedDaysCount > 0) {
-        doc.setFillColor(30, 41, 59)
-        doc.rect(margin, y - 4, contentWidth, 10, 'F')
-        doc.setTextColor(255)
-        doc.setFontSize(9)
-        doc.setFont('helvetica', 'bold')
-        doc.text('TOTAL', margin + 3, y + 3)
-        doc.text(`${workedDaysCount} days`, margin + 3 + colWidths[0] + colWidths[1], y + 3)
-        doc.text(`${hours}h ${minutes}m`, margin + 3 + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], y + 3)
-        doc.text(`\u00a5${summary.totalSalaryYen.toLocaleString()}`, margin + 3 + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + colWidths[4], y + 3)
-        y += 14
-      }
-
-      // Chart capture
-      if (chartRef.current) {
-        if (y > 180) {
-          doc.addPage()
-          y = margin
-        }
-        
-        doc.setTextColor(30)
-        doc.setFontSize(13)
-        doc.setFont('helvetica', 'bold')
-        doc.text('Daily Earnings Chart', margin, y)
-        y += 6
-        
-        const canvas = await html2canvas(chartRef.current, {
-          backgroundColor: '#1e293b',
-          scale: 2,
-          useCORS: true,
-        })
-        const imgData = canvas.toDataURL('image/png')
-        const imgWidth = contentWidth
-        const imgHeight = (canvas.height / canvas.width) * imgWidth
-        doc.addImage(imgData, 'PNG', margin, y, imgWidth, Math.min(imgHeight, 90))
-      }
-
-      doc.save(`salary-report-${format(pStart, "yyyy-MM-dd")}-to-${format(pEnd, "yyyy-MM-dd")}.pdf`)
-    } catch (err) {
-      console.error('PDF export failed:', err)
-    } finally {
-      setIsExporting(false)
-    }
-  }
-
   return (
     <div className="container max-w-6xl mx-auto py-10 px-4">
       <div className="mb-8">
@@ -561,12 +357,12 @@ export default function SalarySummaryPage() {
           <div className="grid gap-6 lg:grid-cols-3">
             {/* Calendar on the Left */}
             <div className="lg:col-span-2">
-              <Card className="rounded-2xl shadow-sm border h-full">
-              <CardHeader className="pb-4">
+              <Card className="rounded-3xl shadow-sm border h-full bg-card/50 backdrop-blur-sm overflow-hidden">
+              <CardHeader className="pb-4 bg-muted/20 border-b">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <CalendarIcon className="w-5 h-5 text-primary" />
+                    <CardTitle className="flex items-center gap-2 text-2xl">
+                      <CalendarIcon className="w-6 h-6 text-primary" />
                       Work Calendar
                     </CardTitle>
                   </div>
@@ -722,105 +518,35 @@ export default function SalarySummaryPage() {
 
             {/* Salary Summary on the Right */}
             <div className="lg:col-span-1">
-              <Card className="rounded-2xl border-none bg-gradient-to-br from-primary/10 via-primary/5 to-background shadow-md h-full p-6">
-                <div className="flex flex-col justify-between items-start gap-4">
-                  <div>
-                    <CardTitle className="text-2xl">Salary Summary</CardTitle>
-                    <CardDescription>
-                      Payroll Period: {format(pStart, "MMM d")} - {format(pEnd, "MMM d, yyyy")}
-                    </CardDescription>
-                  </div>
+              <Card className="rounded-3xl border-none bg-gradient-to-br from-primary/15 via-primary/5 to-background shadow-lg overflow-hidden relative h-full">
+                <div className="absolute top-0 right-0 p-6 opacity-10 pointer-events-none">
+                  <Banknote className="w-32 h-32" />
                 </div>
-                <div className="grid grid-cols-1 gap-6 mt-8">
-                  <div className="space-y-2">
-                    <div className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total Work Time</div>
-                    <div className="text-4xl font-bold flex items-baseline gap-1">
-                      {hours}<span className="text-xl font-semibold text-muted-foreground">h</span> {minutes}<span className="text-xl font-semibold text-muted-foreground">m</span>
+                <CardHeader className="pb-2 relative z-10">
+                  <CardTitle className="text-2xl">Salary Summary</CardTitle>
+                  <CardDescription>
+                    Payroll Period: {format(pStart, "MMM d")} - {format(pEnd, "MMM d, yyyy")}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 gap-6 mt-6 relative z-10">
+                  <div className="space-y-2 p-5 bg-background/50 backdrop-blur rounded-2xl border shadow-sm">
+                    <div className="text-sm font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                      <Clock className="w-4 h-4" /> Total Work Time
+                    </div>
+                    <div className="text-4xl font-black flex items-baseline gap-1 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                      {hours}<span className="text-xl font-bold text-muted-foreground">h</span> {minutes}<span className="text-xl font-bold text-muted-foreground">m</span>
                     </div>
                   </div>
-                  <div className="space-y-2 pt-4 border-t border-primary/10">
-                    <div className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total 1-Month Salary</div>
+                  <div className="space-y-2 p-5 bg-primary/10 rounded-2xl border border-primary/20 shadow-sm">
+                    <div className="text-sm font-bold text-primary/80 uppercase tracking-wider">Total 1-Month Salary</div>
                     <div className="text-5xl font-black text-primary drop-shadow-sm">
                       ¥{summary.totalSalaryYen.toLocaleString()}
                     </div>
                   </div>
-                </div>
-                <div className="mt-6 pt-4 border-t border-primary/10">
-                  <Button 
-                    onClick={handleExportPDF} 
-                    disabled={isExporting}
-                    className="w-full rounded-xl gap-2"
-                    variant="outline"
-                  >
-                    <Download className="w-4 h-4" />
-                    {isExporting ? 'Generating PDF...' : 'Export PDF'}
-                  </Button>
-                </div>
+                </CardContent>
               </Card>
             </div>
           </div>
-
-          {/* Daily Chart */}
-            <Card className="rounded-2xl shadow-sm border w-full flex flex-col bg-slate-900 text-white">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-white">
-                  <BarChart3 className="w-5 h-5 text-primary" />
-                  Daily Earnings Chart
-                </CardTitle>
-                <CardDescription className="text-slate-300">Salary breakdown per day</CardDescription>
-              </CardHeader>
-              <CardContent className="h-[400px] w-full overflow-hidden p-2 sm:p-6">
-                {monthlyChartData.length > 0 ? (
-                  <div ref={chartRef} className="w-full h-full overflow-x-auto pb-2 custom-scrollbar">
-                    <div className="min-w-[750px] h-full pr-4">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={monthlyChartData} margin={{ top: 20, right: 20, left: 0, bottom: 45 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={true} horizontal={true} stroke="hsl(var(--border))" />
-                      <XAxis 
-                        dataKey="date" 
-                        tick={{ fill: '#ffffff', fontSize: 12, angle: -45, textAnchor: 'end', dx: -2, dy: 5 }} 
-                        tickLine={{ stroke: '#ffffff' }}
-                        axisLine={{ stroke: '#ffffff', strokeWidth: 1 }}
-                        interval={0}
-                        minTickGap={0}
-                        label={{ value: 'Date', position: 'insideBottom', offset: -30, fill: '#ffffff', fontSize: 13 }}
-                      />
-                      <YAxis 
-                        tick={{ fill: '#ffffff', fontSize: 12 }} 
-                        tickLine={{ stroke: '#ffffff' }}
-                        axisLine={{ stroke: '#ffffff', strokeWidth: 1 }}
-                        tickFormatter={(value) => `${value}`}
-                        label={{ value: 'Salary (¥)', angle: -90, position: 'insideLeft', offset: 0, fill: '#ffffff', fontSize: 13 }}
-                      />
-                      <RechartsTooltip 
-                        cursor={{ stroke: 'rgba(255,255,255,0.2)', strokeWidth: 1, strokeDasharray: '4 4' }}
-                        contentStyle={{ borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', backgroundColor: '#1e293b', color: '#ffffff' }}
-                        labelStyle={{ color: '#ffffff', fontWeight: 600, marginBottom: '4px' }}
-                        formatter={(value: any) => [`¥${value.toLocaleString()}`, 'Salary']}
-                        labelFormatter={(label, payload) => payload?.[0]?.payload?.fullDate || label}
-                      />
-                      <Legend verticalAlign="top" align="left" iconType="circle" wrapperStyle={{ paddingBottom: '20px', color: '#ffffff' }} />
-                      <Line 
-                        name="Daily Salary"
-                        type="linear" 
-                        dataKey="salary" 
-                        stroke="#f59e0b" 
-                        strokeWidth={2}
-                        activeDot={{ r: 6, fill: "#f59e0b", stroke: "hsl(var(--background))", strokeWidth: 2 }}
-                        dot={{ r: 4, fill: "#f59e0b", strokeWidth: 0 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="h-full w-full flex flex-col items-center justify-center text-muted-foreground">
-                    <Banknote className="w-12 h-12 mb-3 opacity-20" />
-                    <p>No earnings data for this period</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
         </TabsContent>
 
         {/* --- YEARLY TAB --- */}
@@ -851,31 +577,34 @@ export default function SalarySummaryPage() {
 
             {/* Yearly Highlights */}
             <div className="md:col-span-2 space-y-6">
-              <Card className="rounded-2xl border-none bg-gradient-to-br from-primary/10 via-primary/5 to-background shadow-md">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-primary" />
+              <Card className="rounded-3xl border-none bg-gradient-to-br from-primary/15 via-primary/5 to-background shadow-lg overflow-hidden relative">
+                <div className="absolute top-0 right-0 p-6 opacity-10 pointer-events-none">
+                  <FileText className="w-32 h-32" />
+                </div>
+                <CardHeader className="relative z-10">
+                  <CardTitle className="flex items-center gap-2 text-2xl">
+                    <FileText className="w-6 h-6 text-primary" />
                     Annual Overview
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-8">
-                  <div className="grid sm:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total Work Time</div>
-                      <div className="text-4xl font-bold flex items-baseline gap-1">
-                        {yHours}<span className="text-xl font-semibold text-muted-foreground">h</span> {yMinutes}<span className="text-xl font-semibold text-muted-foreground">m</span>
+                <CardContent className="space-y-6 relative z-10">
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div className="space-y-2 p-5 bg-background/50 backdrop-blur rounded-2xl border shadow-sm">
+                      <div className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Total Work Time</div>
+                      <div className="text-4xl font-black flex items-baseline gap-1">
+                        {yHours}<span className="text-xl font-bold text-muted-foreground">h</span> {yMinutes}<span className="text-xl font-bold text-muted-foreground">m</span>
                       </div>
                     </div>
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total Days Worked</div>
-                      <div className="text-4xl font-bold flex items-baseline gap-1">
-                        {yearlySummary.totalWorkDays} <span className="text-xl font-semibold text-muted-foreground">days</span>
+                    <div className="space-y-2 p-5 bg-background/50 backdrop-blur rounded-2xl border shadow-sm">
+                      <div className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Total Days Worked</div>
+                      <div className="text-4xl font-black flex items-baseline gap-1">
+                        {yearlySummary.totalWorkDays} <span className="text-xl font-bold text-muted-foreground">days</span>
                       </div>
                     </div>
                   </div>
                   
-                  <div className="space-y-2 pt-4 border-t">
-                    <div className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total Accumulated Salary</div>
+                  <div className="space-y-2 p-5 bg-primary/10 rounded-2xl border border-primary/20 shadow-sm">
+                    <div className="text-sm font-bold text-primary/80 uppercase tracking-wider">Total Accumulated Salary</div>
                     <div className="text-5xl font-black text-primary drop-shadow-sm">
                       ¥{yearlySummary.totalSalaryYen.toLocaleString()}
                     </div>
