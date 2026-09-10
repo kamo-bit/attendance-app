@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  serverActions: {
+    allowedOrigins: ["localhost:3000", "absenkuy.cc", "www.absenkuy.cc"],
+  },
 };
-
 export default nextConfig;
