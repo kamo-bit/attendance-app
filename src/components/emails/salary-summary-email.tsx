@@ -233,12 +233,22 @@ export const SalarySummaryEmail = ({
               </div>
             </div>
 
-            {/* Print Button */}
-            <div className="print-section no-print">
-              <button className="print-btn" onClick={() => window.print()}>
-                🖨️ Save as PDF / Print
-              </button>
-              <p className="print-hint">Click → In the print dialog, select "Save as PDF" as the destination</p>
+            {/* Save as PDF instructions */}
+            <div style={{
+              background: '#f0f9ff',
+              border: '1px solid #bae6fd',
+              borderRadius: '10px',
+              padding: '16px 20px',
+              marginBottom: '28px',
+            }}>
+              <p style={{ fontSize: '13px', fontWeight: 700, color: '#0369a1', marginBottom: '8px' }}>
+                💾 Cara Simpan sebagai PDF:
+              </p>
+              <ul style={{ fontSize: '13px', color: '#0c4a6e', paddingLeft: '18px', lineHeight: '1.8', margin: 0 }}>
+                <li><strong>Gmail:</strong> Klik ikon 🖨️ Print di pojok kanan atas email → pilih "Save as PDF"</li>
+                <li><strong>Outlook:</strong> Klik File → Print → pilih "Microsoft Print to PDF"</li>
+                <li><strong>Apple Mail:</strong> File → Print → klik tombol PDF di kiri bawah</li>
+              </ul>
             </div>
 
             {/* Detail Table */}
