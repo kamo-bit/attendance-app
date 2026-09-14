@@ -45,7 +45,7 @@ export default function LoginPage() {
       setError(authError.message || "Failed to login")
       setLoading(false)
     } else {
-      router.push("/")
+      window.location.href = "/"
     }
   }
 
@@ -61,6 +61,8 @@ export default function LoginPage() {
     if (authError) {
       setError(authError.message || "Failed to login with Google")
       setLoading(false)
+    } else {
+      window.location.href = "/"
     }
   }
 
