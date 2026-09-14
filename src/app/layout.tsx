@@ -18,8 +18,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Attendance App",
-  description: "Web application for recording attendance",
+  title: "Absen Kuy",
+  description: "Aplikasi absensi harian dan ringkasan gaji",
 };
 
 export default function RootLayout({

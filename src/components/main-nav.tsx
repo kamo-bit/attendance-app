@@ -39,7 +39,7 @@ export function MainNav() {
         <div className="mr-4 hidden md:flex">
           <Link href="/" className="mr-6 flex items-center space-x-2">
             <span className="hidden font-bold sm:inline-block">
-              Attendance App
+              Absen Kuy
             </span>
           </Link>
           <nav className="flex items-center space-x-6 text-sm font-semibold tracking-wide">
@@ -72,7 +72,7 @@ export function MainNav() {
                 </SheetHeader>
                 <div className="flex flex-col gap-4 mt-6 px-2">
                   <Link href="/" onClick={() => setOpen(false)} className="font-bold mb-2 text-lg">
-                    Attendance App
+                    Absen Kuy
                   </Link>
                   {(!isPending && session) && navLinks.map((link) => (
                     <Link
@@ -120,7 +120,7 @@ export function MainNav() {
                 </div>
               </SheetContent>
             </Sheet>
-            <Link href="/" className="font-bold truncate">Attendance App</Link>
+            <Link href="/" className="font-bold truncate">Absen Kuy</Link>
           </div>
           <nav className="flex items-center space-x-2">
             <ThemeToggle />
