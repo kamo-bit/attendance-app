@@ -29,6 +29,18 @@ export async function GET(request: Request) {
   }
 
   try {
+    // Check if today is the 1st of the month in JST (UTC+9)
+    const nowJST = new Date(Date.now() + 9 * 60 * 60 * 1000); // shift UTC to JST
+    const dayOfMonthJST = nowJST.getUTCDate();
+
+    if (dayOfMonthJST !== 1) {
+      return NextResponse.json({
+        success: true,
+        message: `Skipped — today is the ${dayOfMonthJST}th in JST, not the 1st.`,
+        sentCount: 0,
+      });
+    }
+
     // Determine the payroll period. If today is the 21st,
     // the period we are reporting on ended on the 20th.
     const yesterday = new Date();
