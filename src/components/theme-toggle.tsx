@@ -1,23 +1,19 @@
-"use client"
-
-import * as React from "react"
-import { Moon, Sun } from "lucide-react"
-import { useTheme } from "next-themes"
-
-import { Button } from "@/components/ui/button"
+"use client";
+import { Moon, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme()
-
-  const toggleTheme = () => {
-    setTheme(theme === "dark" ? "light" : "dark")
-  }
-
+  const { resolvedTheme, setTheme } = useTheme();
   return (
-    <Button variant="outline" size="icon" onClick={toggleTheme}>
-      <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-      <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-      <span className="sr-only">Toggle theme</span>
-    </Button>
-  )
+    <button
+      type="button"
+      className="icon-button"
+      aria-label="Ganti mode terang atau gelap"
+      title="Ganti mode terang atau gelap"
+      onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+    >
+      <Moon className="dark:hidden" aria-hidden="true" />
+      <Sun className="hidden dark:block" aria-hidden="true" />
+    </button>
+  );
 }

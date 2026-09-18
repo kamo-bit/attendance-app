@@ -1,170 +1,184 @@
-"use client"
+"use client";
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  CalendarDays,
+  Clock3,
+  History,
+  Wallet,
+  LogOut,
+  Coffee,
+} from "lucide-react";
+import { authClient } from "@/lib/auth-client";
+import { ThemeToggle } from "@/components/theme-toggle";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
 
-import { useState } from "react"
-import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
-import { Menu, LogOut, User } from "lucide-react"
-
-import { authClient } from "@/lib/auth-client"
-
-import { ThemeToggle } from "@/components/theme-toggle"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/components/ui/sheet"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-
-export function MainNav() {
-  const pathname = usePathname()
-  const router = useRouter()
-  const [open, setOpen] = useState(false)
-  const [showLogoutDialog, setShowLogoutDialog] = useState(false)
-  const { data: session, isPending } = authClient.useSession()
-
-  const handleLogout = async () => {
-    await authClient.signOut()
-    setOpen(false)
-    setShowLogoutDialog(false)
-    router.push("/login")
-  }
-
-  const navLinks = [
-    { href: "/", label: "Today" },
-    { href: "/history", label: "History" },
-    { href: "/salary-summary", label: "Summary" },
-  ]
-
+export function Brand({ href = "/" }: { href?: string }) {
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-primary/10 bg-background/70 backdrop-blur-xl shadow-sm transition-all duration-300">
-      <div className="container flex h-16 items-center px-4 md:px-8 max-w-screen-2xl mx-auto">
-        <div className="mr-4 hidden md:flex">
-          <Link href="/" className="mr-6 flex items-center space-x-2">
-            <span className="hidden font-bold sm:inline-block">
-              Absen Kuy
-            </span>
-          </Link>
-          <nav className="flex items-center space-x-6 text-sm font-semibold tracking-wide">
-            {(!isPending && session) && navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={cn(
-                  "relative py-1 transition-colors hover:text-primary",
-                  pathname === link.href ? "text-primary" : "text-muted-foreground",
-                  "after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-full after:origin-bottom-right after:scale-x-0 after:bg-primary after:transition-transform after:duration-300 hover:after:origin-bottom-left hover:after:scale-x-100",
-                  pathname === link.href && "after:scale-x-100 after:origin-bottom-left"
-                )}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-        </div>
-        <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
-          <div className="w-full flex-1 md:w-auto md:flex-none flex items-center gap-2 md:hidden">
-            <Sheet open={open} onOpenChange={setOpen}>
-              <SheetTrigger className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground h-9 w-9 md:hidden">
-                <Menu className="h-5 w-5" />
-                <span className="sr-only">Toggle Menu</span>
-              </SheetTrigger>
-              <SheetContent side="left" className="pr-0">
-                <SheetHeader>
-                  <SheetTitle className="sr-only">Mobile Navigation Menu</SheetTitle>
-                </SheetHeader>
-                <div className="flex flex-col gap-4 mt-6 px-2">
-                  <Link href="/" onClick={() => setOpen(false)} className="font-bold mb-2 text-lg">
-                    Absen Kuy
-                  </Link>
-                  {(!isPending && session) && navLinks.map((link) => (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      onClick={() => setOpen(false)}
-                      className={cn(
-                        "text-base transition-colors hover:text-primary px-2 py-1.5 rounded-md",
-                        pathname === link.href ? "text-primary font-bold bg-primary/10" : "text-muted-foreground font-medium"
-                      )}
-                    >
-                      {link.label}
-                    </Link>
-                  ))}
-                  <div className="h-px bg-border my-2 mr-6" />
-                  {!isPending && session ? (
-                    <>
-                      <div className="flex items-center gap-3 py-2 mr-6">
-                        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                          <span className="text-sm font-bold text-primary">
-                            {session.user?.name?.charAt(0)?.toUpperCase() || session.user?.email?.charAt(0)?.toUpperCase() || "U"}
-                          </span>
-                        </div>
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-sm font-semibold truncate">{session.user?.name || "User"}</span>
-                          <span className="text-xs text-muted-foreground truncate">{session.user?.email}</span>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => setShowLogoutDialog(true)}
-                        className="text-left text-foreground/60 hover:text-foreground transition-colors font-medium flex items-center"
-                      >
-                        <LogOut className="mr-2 h-4 w-4" /> Logout
-                      </button>
-                    </>
-                  ) : (
-                    <Link
-                      href="/login"
-                      onClick={() => setOpen(false)}
-                      className="text-foreground/60 hover:text-foreground transition-colors font-medium"
-                    >
-                      Login / Register
-                    </Link>
-                  )}
-                </div>
-              </SheetContent>
-            </Sheet>
-            <Link href="/" className="font-bold truncate">Absen Kuy</Link>
-          </div>
-          <nav className="flex items-center space-x-2">
-            <ThemeToggle />
-            {!isPending && session ? (
-              <div className="hidden md:flex items-center gap-2">
-                <div className="flex items-center gap-2 px-2 py-1 rounded-lg bg-muted/50 border">
-                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
-                    <span className="text-xs font-bold text-primary">
-                      {session.user?.name?.charAt(0)?.toUpperCase() || session.user?.email?.charAt(0)?.toUpperCase() || "U"}
-                    </span>
-                  </div>
-                  <span className="text-sm font-medium max-w-[120px] truncate">{session.user?.name || session.user?.email}</span>
-                </div>
-                <Button variant="ghost" size="sm" onClick={() => setShowLogoutDialog(true)}>
-                  <LogOut className="h-4 w-4" />
-                </Button>
-              </div>
-            ) : (
-              <Link href="/login" className="hidden md:inline-flex text-sm font-bold bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-xl transition-all shadow-sm">
-                Login
-              </Link>
-            )}
-          </nav>
-        </div>
-      </div>
+    <Link href={href} className="brand" aria-label="AbsenKuy, halaman utama">
+      <span className="brand-mark" aria-hidden="true">
+        <Clock3 />
+      </span>
+      <span>
+        Absen<em>Kuy</em>
+      </span>
+    </Link>
+  );
+}
+const links = [
+  { href: "/", label: "Absensi", icon: Clock3 },
+  { href: "/history", label: "Riwayat", icon: History },
+  { href: "/salary-summary", label: "Pendapatan", icon: Wallet },
+];
 
-      <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
-        <DialogContent className="sm:max-w-md">
+export function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const authPage = [
+    "/login",
+    "/register",
+    "/forgot-password",
+    "/reset-password",
+  ].includes(pathname);
+  const { data: session } = authClient.useSession();
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [date, setDate] = useState("");
+  useEffect(() => {
+    setDate(
+      new Intl.DateTimeFormat("id-ID", {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      }).format(new Date()),
+    );
+  }, []);
+  const nav = links.map(({ href, label, icon: Icon }) => (
+    <Link
+      key={href}
+      href={href}
+      className="nav-link"
+      aria-current={pathname === href ? "page" : undefined}
+    >
+      <Icon aria-hidden="true" />
+      <span>{label}</span>
+    </Link>
+  ));
+  async function logout() {
+    setBusy(true);
+    try {
+      const { error } = await authClient.signOut();
+      if (error) throw error;
+      setLogoutOpen(false);
+      router.replace("/login");
+      router.refresh();
+    } catch {
+      toast.error("Belum berhasil keluar. Silakan coba lagi.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <>
+      <a href="#main-content" className="skip-link">
+        Lewati ke konten utama
+      </a>
+      {authPage ? (
+        <header className="auth-header">
+          <Brand href="/login" />
+          <ThemeToggle />
+        </header>
+      ) : (
+        <>
+          <aside className="sidebar">
+            <Brand />
+            <nav className="side-nav" aria-label="Navigasi utama">
+              {nav}
+            </nav>
+            <div className="sidebar-note">
+              <Coffee size={25} />
+              <strong>Kerja tercatat, pikiran tenang.</strong>
+              <p>Jangan lupa luangkan waktu untuk istirahat.</p>
+            </div>
+          </aside>
+          <header className="topbar">
+            <Brand />
+            <div className="topbar-date">
+              <CalendarDays aria-hidden="true" />
+              {date || "Catatan kerja harian"}
+            </div>
+            <nav className="tablet-nav" aria-label="Navigasi utama">
+              {nav}
+            </nav>
+            <div className="account-tools">
+              <ThemeToggle />
+              {session && (
+                <>
+                  <div className="user-chip">
+                    <span className="avatar">
+                      {session.user.name?.charAt(0).toUpperCase() || "A"}
+                    </span>
+                    <span>{session.user.name}</span>
+                  </div>
+                  <button
+                    className="icon-button"
+                    aria-label="Keluar dari akun"
+                    title="Keluar dari akun"
+                    onClick={() => setLogoutOpen(true)}
+                  >
+                    <LogOut aria-hidden="true" />
+                  </button>
+                </>
+              )}
+            </div>
+          </header>
+          <nav className="bottom-nav" aria-label="Navigasi utama">
+            {nav}
+          </nav>
+        </>
+      )}
+      <main id="main-content" className={authPage ? undefined : "app-main"}>
+        {children}
+      </main>
+      <Dialog
+        open={logoutOpen}
+        onOpenChange={(open) => !busy && setLogoutOpen(open)}
+      >
+        <DialogContent className="dialog-panel">
           <DialogHeader>
-            <DialogTitle>Confirm Logout</DialogTitle>
+            <DialogTitle>Keluar dari akun?</DialogTitle>
             <DialogDescription>
-              Are you sure you want to log out of your account?
+              Catatan yang sudah disimpan akan tetap tersedia saat kamu masuk
+              kembali.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="mt-4 flex sm:justify-end gap-2">
-            <Button variant="outline" onClick={() => setShowLogoutDialog(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleLogout}>
-              Logout
-            </Button>
-          </DialogFooter>
+          <div className="actions actions-end">
+            <button
+              className="btn btn-outline"
+              onClick={() => setLogoutOpen(false)}
+              disabled={busy}
+            >
+              Batal
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={logout}
+              disabled={busy}
+            >
+              {busy ? "Keluar…" : "Ya, keluar"}
+            </button>
+          </div>
         </DialogContent>
       </Dialog>
-    </header>
-  )
+    </>
+  );
 }

@@ -1,243 +1,275 @@
-"use client"
-
-import { useState, useEffect } from "react"
-import { format, parseISO } from "date-fns"
-import { History, Edit, Trash2, Coffee, Clock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react"
-import { useRouter } from "next/navigation"
-
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+"use client";
+import { useState } from "react";
+import Link from "next/link";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog"
-import { authClient } from "@/lib/auth-client"
-import { getAttendanceHistory, deleteAttendance, updateAttendance } from "@/app/actions"
-import { toast } from "sonner"
-import { validateAttendanceInput } from "@/lib/utils"
+  ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
+  History,
+  Info,
+  SearchX,
+} from "lucide-react";
+import {
+  useWorkspace,
+  WorkspaceState,
+  StatusBadge,
+} from "@/components/workspace";
+import {
+  activity,
+  dateLabel,
+  duration,
+  monthLabel,
+  yen,
+  type AttendanceRecord,
+} from "@/lib/attendance";
 
+function breaks(record: AttendanceRecord) {
+  if (!record.hasBreak) return "Tanpa istirahat";
+  return [
+    `${record.break1From || "—"}–${record.break1To || "—"}`,
+    ...(record.breakCount === 2
+      ? [`${record.break2From || "—"}–${record.break2To || "—"}`]
+      : []),
+  ].join(" · ");
+}
+function updated(record: AttendanceRecord) {
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(record.updatedAt));
+}
 export default function HistoryPage() {
-  const router = useRouter()
-  const { data: session, isPending } = authClient.useSession()
-  const [records, setRecords] = useState<any[]>([])
-  const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 10
-  
-  // Edit Dialog State
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [editingRecord, setEditingRecord] = useState<any | null>(null)
-  const [editClockIn, setEditClockIn] = useState("")
-  const [editClockOut, setEditClockOut] = useState("")
-  
-  const [editHasBreak, setEditHasBreak] = useState(false)
-  const [editBreakCount, setEditBreakCount] = useState<"1" | "2">("1")
-  const [editBreak1From, setEditBreak1From] = useState("")
-  const [editBreak1To, setEditBreak1To] = useState("")
-  const [editBreak2From, setEditBreak2From] = useState("")
-  const [editBreak2To, setEditBreak2To] = useState("")
-
-  useEffect(() => {
-    if (!isPending && !session) {
-      router.push("/login")
-    }
-  }, [session, isPending, router])
-
-  const loadRecords = async () => {
-    if (!session) return
-    const data = await getAttendanceHistory()
-    setRecords(data)
-  }
-
-  useEffect(() => {
-    loadRecords()
-  }, [session])
-
-    // States and handlers for editing and deleting have been moved to the Summary page.
-
-  if (isPending || !session) return null
-
-  // Sort records by most recently inputted/updated
-  const normalizeTime = (val: any) => {
-    if (!val) return 0;
-    let time = new Date(val).getTime();
-    if (time > 0 && time < 100000000000) {
-      // time is in seconds, convert to milliseconds
-      time *= 1000;
-    }
-    return time;
-  }
-
-  const sortedRecords = [...records].sort((a, b) => {
-    const timeA = Math.max(normalizeTime(a.updatedAt), normalizeTime(a.createdAt))
-    const timeB = Math.max(normalizeTime(b.updatedAt), normalizeTime(b.createdAt))
-    return timeB - timeA
-  })
-
-  // Pagination logic
-  const totalPages = Math.ceil(sortedRecords.length / itemsPerPage)
-  const currentRecords = sortedRecords.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-
+  const workspace = useWorkspace();
+  const [filter, setFilter] = useState("Semua");
+  const [month, setMonth] = useState("");
+  const [page, setPage] = useState(1);
+  if (workspace.loading || workspace.error || !workspace.data)
+    return <WorkspaceState error={workspace.error} retry={workspace.retry} />;
+  const records = workspace.data.records
+    .filter(
+      (r) =>
+        (!month || r.attendanceDate.startsWith(month)) &&
+        (filter === "Semua" || activity(r).label === filter),
+    )
+    .sort(
+      (a, b) =>
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+    );
+  const pages = Math.max(1, Math.ceil(records.length / 10));
+  const currentPage = Math.min(page, pages);
+  const visible = records.slice((currentPage - 1) * 10, currentPage * 10);
+  const detailLink = (record: AttendanceRecord) =>
+    record.status !== "deleted" ? (
+      <Link
+        href={`/salary-summary?date=${record.attendanceDate}`}
+        className="text-button"
+        aria-label={`Lihat pendapatan ${dateLabel(record.attendanceDate)}`}
+      >
+        <span className="xl:hidden">Lihat</span>
+        <ArrowUpRight />
+      </Link>
+    ) : (
+      <span className="field-help">—</span>
+    );
   return (
-    <div className="container max-w-5xl mx-auto py-10 px-4">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Attendance History</h1>
-        <p className="text-muted-foreground mt-2">
-          View your past attendance records, ordered by the most recently inputted or updated data.
+    <div className="page">
+      <header className="page-heading">
+        <div>
+          <div className="eyebrow">AbsenKuy / Riwayat</div>
+          <h1>Riwayat absensi</h1>
+          <p>
+            Diurutkan dari pembaruan terbaru. Lihat aktivitas terakhir setiap
+            catatan.
+          </p>
+        </div>
+      </header>
+      <div className="filters">
+        <div className="actions">
+          <label htmlFor="history-month" className="sr-only">
+            Filter bulan kerja
+          </label>
+          <select
+            id="history-month"
+            className="form-input"
+            value={month}
+            onChange={(e) => {
+              setMonth(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">Semua bulan</option>
+            {[
+              ...new Set(
+                workspace.data.records.map((r) => r.attendanceDate.slice(0, 7)),
+              ),
+            ]
+              .sort()
+              .reverse()
+              .map((value) => (
+                <option key={value} value={value}>
+                  {monthLabel(value)}
+                </option>
+              ))}
+          </select>
+        </div>
+        <div className="filter-status" aria-label="Filter aktivitas">
+          {["Semua", "Dibuat", "Diubah", "Dihapus"].map((label) => (
+            <button
+              key={label}
+              aria-pressed={filter === label}
+              onClick={() => {
+                setFilter(label);
+                setPage(1);
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {!visible.length ? (
+        <section className="panel empty-state">
+          {workspace.data.records.length ? <SearchX /> : <History />}
+          <h2>
+            {workspace.data.records.length
+              ? "Tidak ada catatan yang cocok"
+              : "Belum ada catatan absensi"}
+          </h2>
+          <p>
+            {workspace.data.records.length
+              ? "Coba bulan atau filter aktivitas yang lain."
+              : "Mulai dengan mencatat jam kerja pertamamu. Catatan akan muncul di sini."}
+          </p>
+          <Link href="/" className="btn btn-primary">
+            Catat absensi
+          </Link>
+        </section>
+      ) : (
+        <section
+          className="panel history-panel"
+          aria-label="Daftar riwayat absensi"
+        >
+          <table className="history-table">
+            <thead>
+              <tr>
+                <th>Tanggal kerja</th>
+                <th>Jam kerja</th>
+                <th>Istirahat</th>
+                <th>Jam bersih</th>
+                <th>Estimasi</th>
+                <th>Aktivitas</th>
+                <th>
+                  <span className="sr-only">Lihat catatan</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map((r) => (
+                <tr key={r.id}>
+                  <td>
+                    <strong>{dateLabel(r.attendanceDate)}</strong>
+                    <small>Diperbarui {updated(r)}</small>
+                  </td>
+                  <td>
+                    {r.clockIn || "—"}–{r.clockOut || "—"}
+                  </td>
+                  <td>{breaks(r)}</td>
+                  <td>
+                    {r.status === "draft"
+                      ? "Belum selesai"
+                      : duration(r.workMinutes)}
+                  </td>
+                  <td>
+                    <strong>
+                      {r.status === "draft" ? "—" : yen(r.estimatedSalaryYen)}
+                    </strong>
+                  </td>
+                  <td>
+                    <StatusBadge record={r} />
+                  </td>
+                  <td>{detailLink(r)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="history-cards">
+            {visible.map((r) => (
+              <article
+                key={r.id}
+                className={`panel history-card ${r.status === "deleted" ? "panel-coral" : ""}`}
+              >
+                <header>
+                  <h2>{dateLabel(r.attendanceDate)}</h2>
+                  <StatusBadge record={r} />
+                </header>
+                <div className="summary-line">
+                  <span>Jam kerja</span>
+                  <strong>
+                    {r.clockIn || "—"}–{r.clockOut || "—"}
+                  </strong>
+                </div>
+                <div className="summary-line">
+                  <span>Istirahat</span>
+                  <strong>{breaks(r)}</strong>
+                </div>
+                <div className="summary-line">
+                  <span>Jam bersih</span>
+                  <strong>
+                    {r.status === "draft"
+                      ? "Belum selesai"
+                      : duration(r.workMinutes)}
+                  </strong>
+                </div>
+                <div className="summary-line">
+                  <span>Estimasi pendapatan</span>
+                  <strong>
+                    {r.status === "draft" ? "—" : yen(r.estimatedSalaryYen)}
+                  </strong>
+                </div>
+                <footer>
+                  <small>Diperbarui {updated(r)}</small>
+                  {detailLink(r)}
+                </footer>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+      {visible.length > 0 && (
+        <div className="pagination">
+          <span>
+            {records.length} catatan · Halaman {currentPage} dari {pages}
+          </span>
+          <div className="actions">
+            <button
+              className="icon-button"
+              aria-label="Halaman sebelumnya"
+              disabled={currentPage === 1}
+              onClick={() => setPage(currentPage - 1)}
+            >
+              <ChevronLeft />
+            </button>
+            <button
+              className="icon-button"
+              aria-label="Halaman berikutnya"
+              disabled={currentPage === pages}
+              onClick={() => setPage(currentPage + 1)}
+            >
+              <ChevronRight />
+            </button>
+          </div>
+        </div>
+      )}
+      <div className="notice mt-6">
+        <Info />
+        <p>
+          Catatan yang dihapus tetap ada di riwayat dan tidak dihitung dalam
+          pendapatan.
         </p>
       </div>
-
-      <div className="space-y-8">
-        {sortedRecords.length > 0 && (
-          <div className="space-y-4">
-            <Card className="rounded-3xl border-primary/10 shadow-sm overflow-hidden bg-card/50 backdrop-blur-sm">
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader className="bg-muted/30">
-                      <TableRow className="hover:bg-transparent border-b-primary/10">
-                        <TableHead className="py-4 px-6 font-semibold">Date</TableHead>
-                        <TableHead className="py-4 font-semibold">Clock In</TableHead>
-                        <TableHead className="py-4 font-semibold">Clock Out</TableHead>
-                        <TableHead className="py-4 font-semibold">Breaks</TableHead>
-                        <TableHead className="py-4 text-right font-semibold">Work Hours</TableHead>
-                        <TableHead className="py-4 text-right font-semibold">Salary</TableHead>
-                        <TableHead className="py-4 px-6 text-right font-semibold">Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {currentRecords.map((record: any) => {
-                        const hours = Math.floor(record.workMinutes / 60)
-                        const mins = record.workMinutes % 60
-                        
-                        const breaksList = []
-                        if (record.hasBreak) {
-                          if (record.break1From && record.break1To) breaksList.push(`${record.break1From} - ${record.break1To}`)
-                          if (record.breakCount === 2 && record.break2From && record.break2To) breaksList.push(`${record.break2From} - ${record.break2To}`)
-                        }
-
-                        return (
-                          <TableRow key={record.id} className={`group hover:bg-muted/30 transition-colors ${record.status === "deleted" ? "opacity-60 bg-muted/20" : ""}`}>
-                            <TableCell className={`py-4 px-6 font-medium whitespace-nowrap ${record.status === "deleted" ? "line-through text-muted-foreground" : ""}`}>
-                              {format(parseISO(record.attendanceDate), "MMM d, yyyy")}
-                            </TableCell>
-                            <TableCell className={`py-4 ${record.status === "deleted" ? "line-through text-muted-foreground" : ""}`}>{record.clockIn || "-"}</TableCell>
-                            <TableCell className={`py-4 ${record.status === "deleted" ? "line-through text-muted-foreground" : ""}`}>{record.clockOut || "-"}</TableCell>
-                            <TableCell className={`py-4 ${record.status === "deleted" ? "line-through opacity-50" : ""}`}>
-                              {!record.hasBreak || record.breakCount === 0 ? (
-                                <span className="text-muted-foreground/50 italic">-</span>
-                              ) : (
-                                <div className="flex flex-col gap-1.5 text-xs">
-                                  {breaksList.map((b, i) => (
-                                    <span key={i} className="bg-amber-500/10 text-amber-700 dark:text-amber-400 font-medium px-2.5 py-1 rounded-md w-max border border-amber-500/20">
-                                      {b}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-                            </TableCell>
-                            <TableCell className={`py-4 text-right whitespace-nowrap ${record.status === "deleted" ? "line-through text-muted-foreground" : "font-semibold"}`}>
-                              {hours}<span className="text-muted-foreground/70 text-xs mr-1">h</span>{mins}<span className="text-muted-foreground/70 text-xs">m</span>
-                            </TableCell>
-                            <TableCell className={`py-4 text-right font-bold ${record.status === "deleted" ? "line-through text-muted-foreground" : "text-primary"}`}>
-                              ¥{(record.estimatedSalaryYen || 0).toLocaleString()}
-                            </TableCell>
-                            <TableCell className="py-4 px-6 text-right">
-                              {(() => {
-                                const createdTime = normalizeTime(record.createdAt);
-                                const updatedTime = normalizeTime(record.updatedAt);
-                                const isDeleted = record.status === "deleted";
-                                const isEdited = updatedTime > createdTime + 1000;
-                                const maxTime = Math.max(updatedTime, createdTime);
-                                const actionDate = maxTime > 0 ? new Date(maxTime) : new Date(record.attendanceDate);
-                                
-                                return (
-                                  <div className="flex flex-col items-end gap-1 whitespace-nowrap">
-                                    <span className={`text-[11px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full ${isDeleted ? "bg-rose-500/15 text-rose-600 dark:text-rose-400" : (isEdited ? "bg-amber-500/15 text-amber-600 dark:text-amber-400" : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400")}`}>
-                                      {isDeleted ? "Deleted" : (isEdited ? "Edited" : "Created")}
-                                    </span>
-                                    <span className="text-xs text-muted-foreground">{format(actionDate, "MMM d, HH:mm")}</span>
-                                  </div>
-                                )
-                              })()}
-                            </TableCell>
-                          </TableRow>
-                        )
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-between px-4 py-4 border-t">
-                    <div className="text-sm text-muted-foreground hidden sm:block">
-                      Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, sortedRecords.length)} of {sortedRecords.length} entries
-                    </div>
-                    <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage(1)}
-                        disabled={currentPage === 1}
-                        title="Go to first page"
-                      >
-                        <ChevronsLeft className="w-4 h-4" />
-                        <span className="sr-only">Start</span>
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                        disabled={currentPage === 1}
-                      >
-                        <ChevronLeft className="w-4 h-4 sm:mr-1" />
-                        <span className="hidden sm:inline">Previous</span>
-                      </Button>
-                      <div className="text-sm font-medium">
-                        Page {currentPage} of {totalPages}
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                        disabled={currentPage === totalPages}
-                      >
-                        <span className="hidden sm:inline">Next</span>
-                        <ChevronRight className="w-4 h-4 sm:ml-1" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage(totalPages)}
-                        disabled={currentPage === totalPages}
-                        title="Go to last page"
-                      >
-                        <span className="sr-only">End</span>
-                        <ChevronsRight className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
-        {records.length === 0 && (
-          <Card className="rounded-2xl border shadow-sm">
-            <CardContent className="h-32 flex items-center justify-center text-muted-foreground">
-              No records found.
-            </CardContent>
-          </Card>
-        )}
-      </div>
     </div>
-  )
+  );
 }

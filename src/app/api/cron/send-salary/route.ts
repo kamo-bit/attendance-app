@@ -7,12 +7,12 @@ import { Resend } from 'resend';
 import { render } from '@react-email/render';
 import SalarySummaryEmail from '@/components/emails/salary-summary-email';
 
-const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DAY_NAMES = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 
 function formatMinutes(minutes: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  return `${h}h ${m}m`;
+  return `${h} jam ${m} menit`;
 }
 
 export async function GET(request: Request) {
@@ -62,7 +62,8 @@ export async function GET(request: Request) {
           and(
             eq(attendanceRecords.userId, user.id),
             gte(attendanceRecords.attendanceDate, start),
-            lte(attendanceRecords.attendanceDate, end)
+            lte(attendanceRecords.attendanceDate, end),
+            eq(attendanceRecords.status, 'completed')
           )
         );
 
@@ -104,7 +105,7 @@ export async function GET(request: Request) {
             clockOut: r.clockOut || '',
             breakTime,
             workHours: formatMinutes(r.workMinutes || 0),
-            salary: `¥${(r.estimatedSalaryYen || 0).toLocaleString()}`,
+            salary: `¥${(r.estimatedSalaryYen || 0).toLocaleString('id-ID')}`,
           };
         });
 
@@ -114,11 +115,11 @@ export async function GET(request: Request) {
 
       const emailHtml = await render(
         SalarySummaryEmail({
-          userName: user.name || 'User',
+          userName: user.name || 'Pengguna',
           period: periodLabel,
-          totalWorkHours: `${hours}h ${minutes}m`,
+          totalWorkHours: `${hours} jam ${minutes} menit`,
           totalWorkDays,
-          totalSalary: `¥${totalSalaryYen.toLocaleString()}`,
+          totalSalary: `¥${totalSalaryYen.toLocaleString('id-ID')}`,
           records: dailyRows,
         })
       );
@@ -127,7 +128,7 @@ export async function GET(request: Request) {
       await resend.emails.send({
         from: 'Admin Absensi <admin@absenkuy.cc>',
         to: user.email,
-        subject: `Salary Summary — ${periodLabel}`,
+        subject: `Ringkasan Pendapatan — ${periodLabel}`,
         html: emailHtml,
       });
       sentCount++;

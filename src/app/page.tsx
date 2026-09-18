@@ -1,437 +1,352 @@
-"use client"
-
-import { useState, useEffect } from "react"
-import { format, parseISO, isValid } from "date-fns"
-import { Calendar as CalendarIcon, Clock, Coffee, CheckCircle2 } from "lucide-react"
-import { useRouter } from "next/navigation"
-
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Switch } from "@/components/ui/switch"
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog"
-import { authClient } from "@/lib/auth-client"
-import { getSalarySettings, updateSalarySettings, saveAttendance, getTodayAttendance, getLatestAttendanceRecord, getUserHolidays } from "@/app/actions"
-import { getPayrollPeriod, validateAttendanceInput } from "@/lib/utils"
-import { toast } from "sonner"
+"use client";
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import {
+  Clock3,
+  ReceiptText,
+  CheckCircle2,
+  Save,
+  Info,
+  CalendarDays,
+  ArrowRight,
+} from "lucide-react";
+import { toast } from "sonner";
+import { useWorkspace, WorkspaceState } from "@/components/workspace";
+import { AttendanceFields } from "@/components/attendance-fields";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { saveAttendance, updateSalarySettings } from "@/app/actions";
+import {
+  type AttendanceRecord,
+  type AttendanceInput,
+  blankAttendance,
+  recordToInput,
+  localDate,
+  validDate,
+  dateLabel,
+  calculateAttendance,
+  duration,
+  yen,
+  validateAttendance,
+} from "@/lib/attendance";
 
 export default function Home() {
-  const router = useRouter()
-  const { data: session, isPending } = authClient.useSession()
-  
-  const [attendanceDate, setAttendanceDate] = useState("")
-  const [clockIn, setClockIn] = useState("")
-  const [hasBreak, setHasBreak] = useState(false)
-  const [breakCount, setBreakCount] = useState<"1" | "2">("1")
-  const [break1From, setBreak1From] = useState("")
-  const [break1To, setBreak1To] = useState("")
-  const [break2From, setBreak2From] = useState("")
-  const [break2To, setBreak2To] = useState("")
-  const [clockOut, setClockOut] = useState("")
-  
-  const [hourlyWage, setHourlyWage] = useState(1115)
-  const [isSaving, setIsSaving] = useState(false)
-  const [isCompletedRecord, setIsCompletedRecord] = useState(false)
-  
-  const [showHolidayWarning, setShowHolidayWarning] = useState(false)
-  const [currentTime, setCurrentTime] = useState<Date | null>(null)
-
+  const workspace = useWorkspace();
+  const [date, setDate] = useState("");
   useEffect(() => {
-    setCurrentTime(new Date())
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
-    return () => clearInterval(timer)
-  }, [])
-
-  useEffect(() => {
-    if (!isPending && !session) {
-      router.push("/login")
-    }
-  }, [session, isPending, router])
-
-  useEffect(() => {
-    const today = format(new Date(), "yyyy-MM-dd")
-    setAttendanceDate(today)
-  }, [])
-
-  useEffect(() => {
-    async function loadInitialData() {
-      if (!session || !attendanceDate) return
-      
-      try {
-        const settings = await getSalarySettings()
-        if (settings) {
-          setHourlyWage(settings.hourlyWageYen)
-        }
-
-        const todayRecord = await getTodayAttendance(attendanceDate)
-        if (todayRecord) {
-          setClockIn(todayRecord.clockIn || "")
-          setHasBreak(todayRecord.hasBreak)
-          setBreakCount(todayRecord.breakCount === 2 ? "2" : "1")
-          setBreak1From(todayRecord.break1From || "")
-          setBreak1To(todayRecord.break1To || "")
-          setBreak2From(todayRecord.break2From || "")
-          setBreak2To(todayRecord.break2To || "")
-          setClockOut(todayRecord.clockOut || "")
-          setIsCompletedRecord(todayRecord.status === "completed")
-        } else {
-          // Fetch the most recently inputted record to use as defaults
-          const latestRecord = await getLatestAttendanceRecord()
-          
-          if (latestRecord) {
-            setClockIn(latestRecord.clockIn || "")
-            setHasBreak(latestRecord.hasBreak || false)
-            setBreakCount(latestRecord.breakCount === 2 ? "2" : "1")
-            setBreak1From(latestRecord.break1From || "")
-            setBreak1To(latestRecord.break1To || "")
-            setBreak2From(latestRecord.break2From || "")
-            setBreak2To(latestRecord.break2To || "")
-            setClockOut(latestRecord.clockOut || "")
-          } else {
-            // Reset fields for new date if completely empty history
-            setClockIn("")
-            setHasBreak(false)
-            setBreak1From("")
-            setBreak1To("")
-            setBreak2From("")
-            setBreak2To("")
-            setClockOut("")
-          }
-          
-          setIsCompletedRecord(false)
-        }
-      } catch (error) {
-        console.error(error)
-      }
-    }
-    
-    loadInitialData()
-  }, [session, attendanceDate])
-  
-  const calculateMinutes = (start: string, end: string) => {
-    if (!start || !end) return 0
-    const [h1, m1] = start.split(":").map(Number)
-    const [h2, m2] = end.split(":").map(Number)
-    return (h2 * 60 + m2) - (h1 * 60 + m1)
-  }
-
-  const currentWorkMinutes = (() => {
-    let total = 0
-    if (clockIn && clockOut) {
-      total = calculateMinutes(clockIn, clockOut)
-      if (hasBreak) {
-        if (break1From && break1To) total -= calculateMinutes(break1From, break1To)
-        if (breakCount === "2" && break2From && break2To) total -= calculateMinutes(break2From, break2To)
-      }
-    }
-    return Math.max(0, total)
-  })()
-
-  const handleSaveWage = async (wage: number) => {
-    setHourlyWage(wage)
-    await updateSalarySettings(wage)
-    toast.success("Salary updated successfully")
-  }
-
-  const handleSaveAttendance = async () => {
-    if (!attendanceDate) return
-
-    const validationError = validateAttendanceInput({
-      clockIn, clockOut, hasBreak, breakCount: hasBreak ? (breakCount as any) : 0, 
-      break1From, break1To, break2From, break2To
-    })
-
-    if (validationError) {
-      toast.error(validationError)
-      return
-    }
-
-    try {
-      const savedHolidays = await getUserHolidays()
-      if (savedHolidays && savedHolidays.includes(attendanceDate)) {
-        setShowHolidayWarning(true)
-        return
-      }
-    } catch (e) {
-      console.error("Failed to check holidays", e)
-    }
-
-    await performSave()
-  }
-
-  const performSave = async () => {
-    setShowHolidayWarning(false)
-    setIsSaving(true)
-    
-    try {
-
-
-      const estimatedSalaryYen = Math.floor((currentWorkMinutes / 60) * hourlyWage)
-      const period = getPayrollPeriod(attendanceDate)
-      
-      await saveAttendance({
-        attendanceDate,
-        clockIn,
-        hasBreak,
-        breakCount: hasBreak ? Number(breakCount) : 0,
-        break1From: hasBreak ? break1From : null,
-        break1To: hasBreak ? break1To : null,
-        break2From: hasBreak && breakCount === "2" ? break2From : null,
-        break2To: hasBreak && breakCount === "2" ? break2To : null,
-        clockOut,
-        workMinutes: currentWorkMinutes,
-        hourlyWageYen: hourlyWage,
-        estimatedSalaryYen,
-        payrollPeriodStart: period.start,
-        payrollPeriodEnd: period.end,
-        status: clockOut ? "completed" : "draft"
-      })
-      if (clockOut) {
-        setIsCompletedRecord(true)
-      }
-      toast.success("Attendance saved successfully")
-    } catch (e) {
-      console.error(e)
-      toast.error("Failed to save attendance")
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const hours = Math.floor(currentWorkMinutes / 60)
-  const minutes = currentWorkMinutes % 60
-  const estimatedSalary = Math.floor((currentWorkMinutes / 60) * hourlyWage)
-  
-  const parsedDate = attendanceDate ? parseISO(attendanceDate) : new Date()
-  const displayDate = isValid(parsedDate) ? parsedDate : new Date()
-
-  if (isPending) return null
-  if (!session) return null
-
+    const requested = new URLSearchParams(window.location.search).get("date");
+    setDate(requested && validDate(requested) ? requested : localDate());
+  }, []);
+  if (workspace.loading || workspace.error || !workspace.data || !date)
+    return <WorkspaceState error={workspace.error} retry={workspace.retry} />;
+  const record = workspace.data.records.find(
+    (r) => r.attendanceDate === date && r.status !== "deleted",
+  );
   return (
-    <div className="container max-w-4xl mx-auto py-10 px-4">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Today&apos;s Attendance</h1>
-        <p className="text-muted-foreground mt-2">
-          Log your work hours and track your estimated earnings.
-        </p>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {/* Input Form Column */}
-        <div className="lg:col-span-2 space-y-6">
-          <Card className="rounded-2xl shadow-sm border overflow-hidden transition-all duration-300 hover:shadow-md">
-            <CardHeader className="bg-primary/5 pb-8 pt-8">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <CardTitle className="flex items-center gap-2 text-2xl">
-                  <CalendarIcon className="w-6 h-6 text-primary" />
-                  Clock In / Out
-                </CardTitle>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                  {currentTime && (
-                    <div className="text-xl sm:text-2xl font-black tracking-tighter text-primary font-mono">
-                      {format(currentTime, "HH:mm:ss")}
-                    </div>
-                  )}
-                  <div className="text-sm font-medium bg-background px-3 py-1 rounded-full border shadow-sm">
-                    {format(displayDate, "EEEE, MMM d, yyyy")}
-                  </div>
-                </div>
-              </div>
-              <CardDescription className="pt-2">
-                Record your daily attendance time.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-8 pt-6">
-              
-              {/* Date Input */}
-              <div className="space-y-3 bg-card p-5 rounded-2xl border shadow-sm transition-all hover:shadow-md">
-                <Label htmlFor="date-input" className="text-base font-semibold flex items-center gap-2">
-                  <CalendarIcon className="w-4 h-4 text-primary" /> Log Date
-                </Label>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                  <Input 
-                    id="date-input"
-                    type="date"
-                    value={attendanceDate}
-                    onChange={(e) => setAttendanceDate(e.target.value)}
-                    className="w-full sm:max-w-[220px] h-12 min-h-[3rem] text-lg rounded-xl bg-background [&::-webkit-date-and-time-value]:text-left [&::-webkit-datetime-edit]:p-0"
-                  />
-                  <span className="text-sm text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-lg border">You can log past dates here.</span>
-                </div>
-              </div>
-
-              {/* Time Inputs */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                <div className="space-y-3 bg-emerald-500/5 p-5 rounded-2xl border border-emerald-500/20 transition-all hover:shadow-md">
-                  <Label htmlFor="in" className="text-base font-bold flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
-                    <Clock className="w-5 h-5" /> Time In
-                  </Label>
-                  <Input 
-                    id="in" 
-                    type="time" 
-                    value={clockIn}
-                    onChange={(e) => setClockIn(e.target.value)}
-                    className="h-14 min-h-[3.5rem] text-2xl font-medium rounded-xl border-emerald-500/30 focus-visible:ring-emerald-500 bg-background/80 backdrop-blur-sm [&::-webkit-date-and-time-value]:text-left [&::-webkit-datetime-edit]:p-0 [&::-webkit-datetime-edit-fields-wrapper]:p-0"
-                  />
-                </div>
-                <div className="space-y-3 bg-rose-500/5 p-5 rounded-2xl border border-rose-500/20 transition-all hover:shadow-md">
-                  <Label htmlFor="out" className="text-base font-bold flex items-center gap-2 text-rose-700 dark:text-rose-400">
-                    <Clock className="w-5 h-5" /> Time Out
-                  </Label>
-                  <Input 
-                    id="out" 
-                    type="time" 
-                    value={clockOut}
-                    onChange={(e) => setClockOut(e.target.value)}
-                    className="h-14 min-h-[3.5rem] text-2xl font-medium rounded-xl border-rose-500/30 focus-visible:ring-rose-500 bg-background/80 backdrop-blur-sm [&::-webkit-date-and-time-value]:text-left [&::-webkit-datetime-edit]:p-0 [&::-webkit-datetime-edit-fields-wrapper]:p-0"
-                  />
-                </div>
-              </div>
-
-              {/* Breaks Section */}
-              <div className="rounded-2xl border bg-card p-6 shadow-sm transition-all hover:shadow-md">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                  <div className="space-y-1">
-                    <Label htmlFor="break-switch" className="text-base font-semibold flex items-center gap-2">
-                      <Coffee className="w-5 h-5 text-amber-500" /> Take a break?
-                    </Label>
-                    <p className="text-sm text-muted-foreground">Toggle if you had resting periods.</p>
-                  </div>
-                  <Switch 
-                    id="break-switch" 
-                    checked={hasBreak}
-                    onCheckedChange={setHasBreak}
-                    className="self-start sm:self-auto scale-110"
-                  />
-                </div>
-
-                {hasBreak && (
-                  <div className="space-y-6 pt-6 border-t animate-in fade-in slide-in-from-top-4 duration-300">
-                    <div className="flex p-1 bg-muted/50 rounded-xl w-fit">
-                      <button
-                        onClick={() => setBreakCount("1")}
-                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${breakCount === "1" ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                      >
-                        1 Break
-                      </button>
-                      <button
-                        onClick={() => setBreakCount("2")}
-                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${breakCount === "2" ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                      >
-                        2 Breaks
-                      </button>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between bg-amber-500/5 border border-amber-500/20 p-5 rounded-2xl">
-                        <div className="text-sm font-bold text-amber-700 dark:text-amber-500 shrink-0">Break 1</div>
-                        <div className="flex flex-col min-[400px]:flex-row items-center gap-3 w-full sm:w-auto flex-1 sm:max-w-[340px]">
-                          <Input type="time" value={break1From} onChange={(e) => setBreak1From(e.target.value)} className="h-12 text-lg rounded-xl bg-background flex-1 w-full" />
-                          <span className="text-muted-foreground shrink-0 text-sm hidden min-[400px]:inline">to</span>
-                          <Input type="time" value={break1To} onChange={(e) => setBreak1To(e.target.value)} className="h-12 text-lg rounded-xl bg-background flex-1 w-full" />
-                        </div>
-                      </div>
-                      
-                      {breakCount === "2" && (
-                        <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between bg-amber-500/5 border border-amber-500/20 p-5 rounded-2xl animate-in fade-in zoom-in duration-300">
-                          <div className="text-sm font-bold text-amber-700 dark:text-amber-500 shrink-0">Break 2</div>
-                          <div className="flex flex-col min-[400px]:flex-row items-center gap-3 w-full sm:w-auto flex-1 sm:max-w-[340px]">
-                            <Input type="time" value={break2From} onChange={(e) => setBreak2From(e.target.value)} className="h-12 text-lg rounded-xl bg-background flex-1 w-full" />
-                            <span className="text-muted-foreground shrink-0 text-sm hidden min-[400px]:inline">to</span>
-                            <Input type="time" value={break2To} onChange={(e) => setBreak2To(e.target.value)} className="h-12 text-lg rounded-xl bg-background flex-1 w-full" />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-              {isCompletedRecord && (
-                <div className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 p-4 rounded-xl text-sm flex items-start gap-2 mt-6">
-                  <div className="mt-0.5">
-                    <CheckCircle2 className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <strong>Attendance Completed</strong>
-                    <p>You have already completed your attendance for today. Please edit from the History page to make changes.</p>
-                  </div>
-                </div>
-              )}
-
-              </CardContent>
-            <CardFooter className="bg-muted/30 pt-6">
-              <Button 
-                onClick={handleSaveAttendance} 
-                className="w-full h-12 text-lg rounded-xl"
-                disabled={isSaving || isCompletedRecord}
-              >
-                {isSaving ? "Saving..." : "Save Record"}
-              </Button>
-            </CardFooter>
-          </Card>
+    <div className="page">
+      <div className="eyebrow">AbsenKuy / Catatan harian</div>
+      <header className="page-heading">
+        <div>
+          <h1>{date === localDate() ? "Absensi hari ini" : "Catat absensi"}</h1>
+          <p>
+            Catat jam kerja dan istirahat untuk menghitung estimasi pendapatan.
+          </p>
         </div>
+        <span className="ribbon">
+          <CalendarDays size={15} />
+          {dateLabel(date)}
+        </span>
+      </header>
+      <AttendanceEditor
+        key={`${date}-${record?.updatedAt || "new"}`}
+        date={date}
+        onDateChange={setDate}
+        record={record}
+        wage={workspace.data.wage}
+        holidays={workspace.data.holidays}
+        reload={workspace.reload}
+      />
+    </div>
+  );
+}
 
-        {/* Summary Column */}
-        <div className="space-y-6">
-          <Card className="rounded-3xl border-none bg-gradient-to-br from-primary/15 via-primary/5 to-background shadow-lg overflow-hidden relative">
-            <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
-              <Clock className="w-32 h-32" />
+function AttendanceEditor({
+  date,
+  onDateChange,
+  record,
+  wage,
+  holidays,
+  reload,
+}: {
+  date: string;
+  onDateChange: (date: string) => void;
+  record?: AttendanceRecord;
+  wage: number;
+  holidays: string[];
+  reload: () => Promise<void>;
+}) {
+  const [value, setValue] = useState<AttendanceInput>(() =>
+    record ? recordToInput(record) : blankAttendance(date),
+  );
+  const [wageInput, setWageInput] = useState(String(wage));
+  const [saving, setSaving] = useState(false);
+  const [savingWage, setSavingWage] = useState(false);
+  const [error, setError] = useState("");
+  const [wageError, setWageError] = useState("");
+  const [holidayStatus, setHolidayStatus] = useState<
+    "draft" | "completed" | null
+  >(null);
+  const complete = record?.status === "completed";
+  const rate = record?.hourlyWageYen ?? wage;
+  const { gross, rest, net } = calculateAttendance(value);
+  function change(next: AttendanceInput) {
+    setError("");
+    if (next.attendanceDate && next.attendanceDate !== date)
+      onDateChange(next.attendanceDate);
+    else setValue(next);
+  }
+  async function saveRate() {
+    setWageError("");
+    setSavingWage(true);
+    try {
+      const result = await updateSalarySettings(Number(wageInput));
+      if (result.error) {
+        setWageError(result.error);
+        return;
+      }
+      await reload();
+      toast.success("Tarif baru berhasil disimpan.");
+    } catch {
+      setWageError("Tarif belum tersimpan. Silakan coba lagi.");
+    } finally {
+      setSavingWage(false);
+    }
+  }
+  async function save(status: "draft" | "completed", confirmed = false) {
+    const next = { ...value, status };
+    const validation = validateAttendance(next);
+    if (validation) {
+      setError(validation);
+      return;
+    }
+    if (holidays.includes(date) && !confirmed) {
+      setHolidayStatus(status);
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const result = await saveAttendance(next);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      toast.success(
+        status === "completed"
+          ? "Absensi berhasil disimpan."
+          : "Draf berhasil disimpan. Lengkapi jam pulang saat selesai bekerja.",
+      );
+      await reload();
+    } catch {
+      setError("Absensi belum tersimpan. Periksa koneksi dan coba lagi.");
+    } finally {
+      setSaving(false);
+      setHolidayStatus(null);
+    }
+  }
+  return (
+    <>
+      <div className="attendance-grid">
+        <section className="panel">
+          <div className="panel-title">
+            <span className="icon-tile">
+              <Clock3 />
+            </span>
+            <h2>Jam kerja</h2>
+          </div>
+          <AttendanceFields
+            value={value}
+            onChange={change}
+            disabled={saving}
+            readOnly={complete}
+          />
+          {complete && (
+            <div className="notice mt-5">
+              <CheckCircle2 />
+              <div>
+                Absensi tanggal ini sudah selesai.{" "}
+                <Link
+                  className="inline-link"
+                  href={`/salary-summary?date=${date}`}
+                >
+                  Ubah melalui Pendapatan
+                </Link>
+                .
+              </div>
             </div>
-            <CardHeader className="pb-4">
-              <CardTitle className="text-2xl">Daily Summary</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-8 relative z-10">
-              <div className="space-y-2 p-5 bg-background/50 backdrop-blur rounded-2xl border shadow-sm">
-                <div className="text-sm font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                  <Clock className="w-4 h-4" /> Total Work Time
-                </div>
-                <div className="text-5xl font-black flex items-baseline gap-1 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                  {hours}<span className="text-2xl font-bold text-muted-foreground">h</span> {minutes}<span className="text-2xl font-bold text-muted-foreground">m</span>
-                </div>
+          )}
+          {record?.status === "draft" && (
+            <div className="notice mt-5">
+              <Save />
+              <span>Draf tersimpan. Lengkapi catatan lalu simpan absensi.</span>
+            </div>
+          )}
+          <p className="field-help mt-5">
+            Jam masuk dan pulang dicatat pada tanggal yang sama.
+          </p>
+        </section>
+        <section
+          className="panel panel-gold stack"
+          aria-label="Ringkasan harian"
+        >
+          <div className="panel-title mb-0">
+            <span className="icon-tile gold">
+              <ReceiptText />
+            </span>
+            <h2>Ringkasan harian</h2>
+          </div>
+          <div className="summary-math">
+            <div className="summary-line">
+              <span>Rentang jam kerja</span>
+              <strong>{duration(gross)}</strong>
+            </div>
+            <div className="summary-line">
+              <span>Total istirahat</span>
+              <strong className="text-coral">− {duration(rest)}</strong>
+            </div>
+            <div className="summary-line summary-total">
+              <span>Jam kerja bersih</span>
+              <strong>{duration(net)}</strong>
+            </div>
+          </div>
+          <div className="field">
+            <label htmlFor="hourly-wage">Upah per jam</label>
+            <div className="wage-control">
+              <div className="money-input">
+                <span aria-hidden="true">¥</span>
+                <input
+                  className="form-input"
+                  id="hourly-wage"
+                  type="number"
+                  inputMode="numeric"
+                  min="1"
+                  max="1000000"
+                  step="1"
+                  value={wageInput}
+                  onChange={(e) => setWageInput(e.target.value)}
+                  aria-describedby="wage-help"
+                  aria-invalid={Boolean(wageError)}
+                />
               </div>
-              
-              <div className="space-y-2 p-5 bg-primary/10 rounded-2xl border border-primary/20 shadow-sm">
-                <div className="text-sm font-bold text-primary/80 uppercase tracking-wider">Estimated Salary</div>
-                <div className="text-4xl font-black text-primary drop-shadow-sm">
-                  ¥{estimatedSalary.toLocaleString()}
-                </div>
-                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-primary/10">
-                  <Label htmlFor="wage-input" className="text-sm font-medium text-primary/80 whitespace-nowrap">Base Wage (¥/hr):</Label>
-                  <Input 
-                    id="wage-input"
-                    type="number"
-                    value={hourlyWage || ""}
-                    onChange={(e) => handleSaveWage(Number(e.target.value))}
-                    className="h-9 w-24 px-3 py-1 font-bold bg-background shadow-inner rounded-lg border-primary/20"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              <button
+                className="btn btn-secondary"
+                type="button"
+                onClick={saveRate}
+                disabled={savingWage || Number(wageInput) === wage}
+              >
+                {savingWage ? "Menyimpan…" : "Simpan tarif"}
+              </button>
+            </div>
+            <p id="wage-help" className="field-help">
+              Catatan tersimpan tetap memakai tarif saat dicatat.
+            </p>
+            {record && (
+              <p className="field-help">
+                Tarif catatan ini: <strong>{yen(rate)}/jam</strong>
+              </p>
+            )}
+            {Number(wageInput) !== wage && (
+              <p className="field-help">Perubahan tarif belum disimpan.</p>
+            )}
+            {wageError && (
+              <p className="error-text" role="alert">
+                {wageError}
+              </p>
+            )}
+          </div>
+          <div className="earnings-total" aria-live="polite">
+            <p>ESTIMASI PENDAPATAN</p>
+            <strong>{yen(Math.floor((net * rate) / 60))}</strong>
+            <p className="mt-2">
+              {duration(net)} × {yen(rate)}/jam
+            </p>
+          </div>
+          {error && (
+            <div role="alert" className="notice error">
+              <Info />
+              <span>{error}</span>
+            </div>
+          )}
+          {complete ? (
+            <Link
+              className="btn btn-secondary"
+              href={`/salary-summary?date=${date}`}
+            >
+              Lihat catatan di Pendapatan
+              <ArrowRight />
+            </Link>
+          ) : (
+            <div className="grid gap-3">
+              <button
+                type="button"
+                className="btn btn-primary btn-full"
+                onClick={() => save("completed")}
+                disabled={saving || savingWage}
+              >
+                <CheckCircle2 />
+                {saving ? "Menyimpan…" : "Simpan absensi"}
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-full"
+                onClick={() => save("draft")}
+                disabled={saving || savingWage}
+              >
+                <Save />
+                Simpan draf
+              </button>
+              <p className="field-help text-center">
+                Draf belum dihitung dalam total pendapatan.
+              </p>
+            </div>
+          )}
+        </section>
       </div>
-
-      <Dialog open={showHolidayWarning} onOpenChange={setShowHolidayWarning}>
-        <DialogContent>
+      <Dialog
+        open={Boolean(holidayStatus)}
+        onOpenChange={(open) => !open && !saving && setHolidayStatus(null)}
+      >
+        <DialogContent className="dialog-panel">
           <DialogHeader>
-            <DialogTitle>Confirm Holiday Work</DialogTitle>
+            <DialogTitle>Tanggal ini ditandai hari libur</DialogTitle>
             <DialogDescription>
-              The date you selected ({format(displayDate, "MMM d, yyyy")}) is marked as a holiday. Are you sure you want to log work hours for this day?
+              {dateLabel(date, true)} ada di daftar hari liburmu. Kamu tetap
+              bisa mencatat jam kerja pada tanggal ini.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setShowHolidayWarning(false)}>
-              Cancel
-            </Button>
-            <Button onClick={performSave}>
-              Yes, I worked
-            </Button>
-          </DialogFooter>
+          <div className="actions actions-end">
+            <button
+              className="btn btn-outline"
+              disabled={saving}
+              onClick={() => setHolidayStatus(null)}
+            >
+              Batal
+            </button>
+            <button
+              className="btn btn-primary"
+              disabled={saving}
+              onClick={() => holidayStatus && save(holidayStatus, true)}
+            >
+              {saving ? "Menyimpan…" : "Tetap simpan"}
+            </button>
+          </div>
         </DialogContent>
       </Dialog>
-    </div>
-  )
+    </>
+  );
 }

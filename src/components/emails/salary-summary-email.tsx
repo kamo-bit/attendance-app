@@ -20,24 +20,24 @@ interface SalarySummaryEmailProps {
 }
 
 export const SalarySummaryEmail = ({
-  userName = "User",
-  period = "this month",
-  totalWorkHours = "0h 0m",
+  userName = "Pengguna",
+  period = "bulan ini",
+  totalWorkHours = "0 jam",
   totalWorkDays = 0,
   totalSalary = "¥0",
   records = [],
 }: SalarySummaryEmailProps) => {
   return (
-    <html lang="en">
+    <html lang="id">
       <head>
         <meta charSet="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Salary Summary — {period}</title>
+        <title>Ringkasan Pendapatan — {period}</title>
         <style>{`
           * { box-sizing: border-box; margin: 0; padding: 0; }
           body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background-color: #f1f5f9;
+            background-color: #eff8f7;
             color: #0f172a;
             padding: 32px 16px;
           }
@@ -47,7 +47,7 @@ export const SalarySummaryEmail = ({
           }
           /* Header */
           .header {
-            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            background: linear-gradient(135deg, #1e8c86 0%, #2ba8a2 100%);
             border-radius: 16px 16px 0 0;
             padding: 36px 40px;
             text-align: center;
@@ -118,7 +118,7 @@ export const SalarySummaryEmail = ({
             margin-bottom: 28px;
           }
           thead tr {
-            background: #4f46e5;
+            background: #1e8c86;
             color: #ffffff;
           }
           thead th {
@@ -131,7 +131,7 @@ export const SalarySummaryEmail = ({
           thead th:first-child { border-radius: 8px 0 0 0; }
           thead th:last-child { border-radius: 0 8px 0 0; }
           tbody tr:nth-child(even) { background: #f8fafc; }
-          tbody tr:hover { background: #f1f5f9; }
+          tbody tr:hover { background: #eff8f7; }
           tbody td {
             padding: 10px 12px;
             color: #334155;
@@ -172,7 +172,7 @@ export const SalarySummaryEmail = ({
           }
           .print-btn {
             display: inline-block;
-            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            background: linear-gradient(135deg, #1e8c86 0%, #2ba8a2 100%);
             color: #ffffff !important;
             text-decoration: none;
             padding: 13px 32px;
@@ -205,30 +205,30 @@ export const SalarySummaryEmail = ({
         <div className="wrapper">
           {/* Header */}
           <div className="header">
-            <h1>📋 Gajimu sasi iki cokkk!!!</h1>
-            <p>Payroll Period: {period}</p>
+            <h1>📋 Ringkasan pendapatanmu</h1>
+            <p>Periode gaji: {period}</p>
           </div>
 
           {/* Card */}
           <div className="card">
             <p className="greeting">
-              Hi <strong>{userName}</strong>,<br />
-              Total gajimu sasi iki cokkk!!! <strong>{period}</strong>.
-              Save aja kalo butuh.
+              Halo <strong>{userName}</strong>,<br />
+              Berikut estimasi pendapatan dan jam kerjamu untuk periode <strong>{period}</strong>.
+              Simpan ringkasan ini untuk catatanmu.
             </p>
 
             {/* Summary Boxes */}
             <div className="summary-grid">
               <div className="summary-box">
-                <div className="label">Days Worked</div>
-                <div className="value">{totalWorkDays} days</div>
+                <div className="label">Hari kerja</div>
+                <div className="value">{totalWorkDays} hari</div>
               </div>
               <div className="summary-box">
-                <div className="label">Total Work Hours</div>
+                <div className="label">Total jam kerja</div>
                 <div className="value">{totalWorkHours}</div>
               </div>
               <div className="summary-box highlight">
-                <div className="label">Total Salary</div>
+                <div className="label">Estimasi pendapatan</div>
                 <div className="value">{totalSalary}</div>
               </div>
             </div>
@@ -254,18 +254,18 @@ export const SalarySummaryEmail = ({
             {/* Detail Table */}
             {records.length > 0 && (
               <>
-                <div className="table-title">📅 Daily Attendance Detail</div>
+                <div className="table-title">📅 Rincian absensi harian</div>
                 <table>
                   <thead>
                     <tr>
                       <th>No.</th>
-                      <th>Date</th>
-                      <th>Day</th>
-                      <th>Clock In</th>
-                      <th>Clock Out</th>
-                      <th>Break</th>
-                      <th className="td-right">Work Hours</th>
-                      <th className="td-right">Salary (¥)</th>
+                      <th>Tanggal</th>
+                      <th>Hari</th>
+                      <th>Jam masuk</th>
+                      <th>Jam pulang</th>
+                      <th>Istirahat</th>
+                      <th className="td-right">Jam kerja</th>
+                      <th className="td-right">Pendapatan (¥)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -284,7 +284,7 @@ export const SalarySummaryEmail = ({
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td colSpan={6}>TOTAL ({totalWorkDays} working days)</td>
+                      <td colSpan={6}>TOTAL ({totalWorkDays} hari kerja)</td>
                       <td className="td-right">{totalWorkHours}</td>
                       <td className="td-right">{totalSalary}</td>
                     </tr>
@@ -294,8 +294,8 @@ export const SalarySummaryEmail = ({
             )}
 
             <p className="footer">
-              This is an automated email from <strong>AbsenKuy</strong>.<br />
-              Please do not reply to this email.
+              Email ini dikirim otomatis oleh <strong>AbsenKuy</strong>.<br />
+              Mohon tidak membalas email ini.
             </p>
           </div>
         </div>
