@@ -4,7 +4,7 @@ import { attendanceRecords, users } from '@/db/schema';
 import { eq, and, gte, lte } from 'drizzle-orm';
 import { getPayrollPeriod } from '@/lib/utils';
 import { Resend } from 'resend';
-import { render } from '@react-email/render';
+import { render, toPlainText } from '@react-email/render';
 import SalarySummaryEmail from '@/components/emails/salary-summary-email';
 
 const DAY_NAMES = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
@@ -111,7 +111,11 @@ export async function GET(request: Request) {
 
       const hours = Math.floor(totalWorkMinutes / 60);
       const minutes = totalWorkMinutes % 60;
-      const periodLabel = `${start} ~ ${end}`;
+      const periodLabel = new Intl.DateTimeFormat('id-ID', {
+        day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
+      }).formatRange(new Date(start + 'T00:00:00Z'), new Date(end + 'T00:00:00Z'));
+      const summaryUrl = new URL('/salary-summary', process.env.NEXT_PUBLIC_APP_URL || 'https://www.absenkuy.cc');
+      summaryUrl.searchParams.set('date', end);
 
       const emailHtml = await render(
         SalarySummaryEmail({
@@ -121,6 +125,7 @@ export async function GET(request: Request) {
           totalWorkDays,
           totalSalary: `¥${totalSalaryYen.toLocaleString('id-ID')}`,
           records: dailyRows,
+          summaryUrl: summaryUrl.toString(),
         })
       );
 
@@ -130,6 +135,7 @@ export async function GET(request: Request) {
         to: user.email,
         subject: `Ringkasan Pendapatan — ${periodLabel}`,
         html: emailHtml,
+        text: toPlainText(emailHtml),
       });
       sentCount++;
     }
