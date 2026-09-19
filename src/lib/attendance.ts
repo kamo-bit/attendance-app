@@ -39,6 +39,42 @@ export function recordToInput(record: AttendanceRecord): AttendanceInput {
     status: record.status === "completed" ? "completed" : "draft",
   };
 }
+export function attendanceFormDefaults(
+  date: string,
+  records: AttendanceRecord[],
+): { value: AttendanceInput; sourceDate: string | null } {
+  const existing = records.find(
+    (record) => record.attendanceDate === date && record.status !== "deleted",
+  );
+  if (existing) return { value: recordToInput(existing), sourceDate: null };
+
+  // Use the work date, not the update date: editing an old record must not
+  // replace the most recent working day's schedule.
+  const previous = records
+    .filter(
+      (record) => record.status === "completed" && record.attendanceDate < date,
+    )
+    .sort((a, b) => b.attendanceDate.localeCompare(a.attendanceDate))[0];
+  if (!previous) return { value: blankAttendance(date), sourceDate: null };
+
+  const source = recordToInput(previous);
+  return {
+    sourceDate: previous.attendanceDate,
+    value: {
+      ...blankAttendance(date),
+      clockIn: source.clockIn,
+      clockOut: source.clockOut,
+      hasBreak: source.hasBreak,
+      breakCount: source.hasBreak ? source.breakCount : 0,
+      break1From: source.hasBreak ? source.break1From : "",
+      break1To: source.hasBreak ? source.break1To : "",
+      break2From:
+        source.hasBreak && source.breakCount === 2 ? source.break2From : "",
+      break2To:
+        source.hasBreak && source.breakCount === 2 ? source.break2To : "",
+    },
+  };
+}
 export function localDate(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }

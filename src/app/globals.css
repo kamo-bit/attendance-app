@@ -507,6 +507,55 @@
   font-variant-numeric: tabular-nums;
   min-height: 56px;
 }
+.time-control {
+  position: relative;
+  min-width: 0;
+}
+.time-control .form-input {
+  padding-right: 48px;
+  font-variant-numeric: tabular-nums;
+}
+.time-control-button {
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--shape-control);
+  color: var(--teal-text);
+  background: transparent;
+}
+.time-control-button:hover:not(:disabled) {
+  background: var(--soft);
+}
+.time-control-button svg,
+.time-trigger svg {
+  width: 18px;
+  height: 18px;
+}
+.time-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+.time-trigger svg {
+  color: var(--teal-text);
+}
+.time-trigger:disabled {
+  opacity: 1;
+  color: var(--muted-foreground);
+}
+.time-placeholder {
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
 .time-label {
   display: flex;
   align-items: center;
@@ -1203,6 +1252,182 @@
   min-height: 44px;
   min-width: 44px;
   border-radius: var(--shape-circle);
+}
+.dialog-panel[data-nested-dialog-open] {
+  opacity: 0.4;
+  filter: blur(2px);
+}
+.dialog-panel.clock-picker[data-slot="dialog-content"] {
+  max-width: min(380px, calc(100% - 24px));
+  padding: 20px;
+  gap: 12px;
+}
+.clock-layout {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.clock-settings {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+.clock-readout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 32px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.clock-readout button {
+  min-width: 58px;
+  border: 1px solid var(--border);
+  border-radius: var(--shape-control);
+  background: var(--input-surface);
+  padding: 4px 8px;
+  color: var(--foreground);
+  font-size: 36px;
+  line-height: 1.2;
+  font-weight: 800;
+}
+.clock-readout button[aria-pressed="true"] {
+  background: var(--soft);
+  border-color: var(--teal);
+  color: var(--teal-text);
+}
+.clock-readout small {
+  display: block;
+  font-size: 11px;
+  font-weight: 650;
+  margin: 3px 0;
+}
+.clock-period {
+  flex-direction: column;
+  border-radius: var(--shape-card);
+  gap: 2px;
+}
+.clock-period button {
+  padding: 6px 10px;
+  min-height: 40px;
+  font-size: 12px;
+}
+.clock-help {
+  grid-column: 1 / -1;
+  min-height: 38px;
+  text-align: center;
+}
+.clock-dial {
+  position: relative;
+  width: min(100%, 256px);
+  aspect-ratio: 1;
+  justify-self: center;
+  border: 1px solid var(--border);
+  border-radius: var(--shape-circle);
+  background: var(--soft);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+}
+.clock-dial:active {
+  cursor: grabbing;
+}
+.clock-hand {
+  position: absolute;
+  width: 2px;
+  height: 38%;
+  bottom: 50%;
+  left: 50%;
+  transform-origin: center bottom;
+  background: var(--teal);
+  pointer-events: none;
+}
+.clock-hand::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 34px;
+  height: 34px;
+  transform: translate(-50%, -50%);
+  border-radius: var(--shape-circle);
+  background: var(--teal);
+}
+.clock-center {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: var(--shape-circle);
+  background: var(--teal-text);
+  pointer-events: none;
+}
+.clock-number {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.clock-number[data-selected="true"] {
+  color: #092b28;
+  font-weight: 800;
+}
+.clock-tick {
+  position: absolute;
+  width: 1px;
+  height: 3px;
+  background: var(--muted-foreground);
+  opacity: 0.5;
+  pointer-events: none;
+}
+.clock-tick.major {
+  width: 2px;
+  height: 6px;
+}
+.clock-tools {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.clock-picker .actions-end {
+  align-items: stretch;
+}
+.dialog-panel.clock-picker .actions-end > .btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-inline: 12px;
+  font-size: 13px;
+}
+@media (min-width: 600px) and (max-height: 600px) {
+  .dialog-panel.clock-picker[data-slot="dialog-content"] {
+    max-width: min(560px, calc(100% - 24px));
+    padding: 16px;
+    gap: 10px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .clock-picker > [data-slot="dialog-header"],
+  .clock-picker > .field,
+  .clock-layout {
+    grid-column: 1 / -1;
+  }
+  .clock-layout {
+    grid-template-columns: 1fr 180px;
+    align-items: center;
+  }
+  .clock-dial {
+    width: 180px;
+  }
+  .clock-tools .text-button {
+    font-size: 12px;
+  }
 }
 .auth-header {
   height: 90px;

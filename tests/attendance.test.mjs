@@ -26,6 +26,7 @@ const {
   sumRecords,
   yen,
   validDate,
+  attendanceFormDefaults,
 } = compiled.exports;
 const complete = {
   ...blankAttendance("2026-09-18"),
@@ -156,4 +157,111 @@ test("summary excludes drafts and deleted records and uses stored earnings", () 
     },
   ];
   assert.deepEqual(sumRecords(rows), { salary: 10715, minutes: 540, days: 2 });
+});
+
+test("new date copies the nearest earlier completed schedule, including both breaks", () => {
+  const records = [
+    { ...complete, attendanceDate: "2026-09-16", updatedAt: "2026-09-22" },
+    {
+      ...complete,
+      attendanceDate: "2026-09-19",
+      status: "draft",
+      clockOut: "",
+    },
+    { ...complete, attendanceDate: "2026-09-19", status: "deleted" },
+    { ...complete, attendanceDate: "2026-09-21", clockIn: "10:00" },
+    {
+      ...complete,
+      attendanceDate: "2026-09-18",
+      breakCount: 2,
+      break2From: "15:00",
+      break2To: "15:15",
+      hourlyWageYen: 1200,
+      id: "source",
+    },
+  ];
+  const order = records.map((record) => record.attendanceDate);
+  const result = attendanceFormDefaults("2026-09-20", records);
+  assert.equal(result.sourceDate, "2026-09-18");
+  assert.deepEqual(result.value, {
+    ...complete,
+    attendanceDate: "2026-09-20",
+    status: "draft",
+    breakCount: 2,
+    break2From: "15:00",
+    break2To: "15:15",
+  });
+  assert.deepEqual(
+    records.map((record) => record.attendanceDate),
+    order,
+  );
+  assert.equal(records[4].attendanceDate, "2026-09-18");
+});
+
+test("saved draft and completed record take priority over defaults", () => {
+  for (const status of ["draft", "completed"]) {
+    const current = {
+      ...complete,
+      attendanceDate: "2026-09-19",
+      status,
+      clockIn: "10:30",
+      clockOut: status === "draft" ? "" : "18:30",
+    };
+    const result = attendanceFormDefaults("2026-09-19", [complete, current]);
+    assert.equal(result.sourceDate, null);
+    assert.equal(result.value.clockIn, "10:30");
+    assert.equal(result.value.clockOut, current.clockOut);
+    assert.equal(result.value.status, status);
+  }
+});
+
+test("no earlier completed record leaves the form blank", () => {
+  const result = attendanceFormDefaults("2026-09-17", [complete]);
+  assert.deepEqual(result, {
+    value: blankAttendance("2026-09-17"),
+    sourceDate: null,
+  });
+  assert.deepEqual(attendanceFormDefaults("2026-09-19", []), {
+    value: blankAttendance("2026-09-19"),
+    sourceDate: null,
+  });
+});
+
+test("disabled and unused break values are not carried into a new date", () => {
+  const noBreak = attendanceFormDefaults("2026-09-19", [
+    {
+      ...complete,
+      hasBreak: false,
+      breakCount: 2,
+      break2From: "15:00",
+      break2To: "15:15",
+    },
+  ]).value;
+  assert.equal(noBreak.hasBreak, false);
+  assert.equal(noBreak.breakCount, 0);
+  for (const field of ["break1From", "break1To", "break2From", "break2To"])
+    assert.equal(noBreak[field], "");
+  const oneBreak = attendanceFormDefaults("2026-09-19", [
+    { ...complete, break2From: "15:00", break2To: "15:15" },
+  ]).value;
+  assert.equal(oneBreak.breakCount, 1);
+  assert.equal(oneBreak.break1From, "12:00");
+  assert.equal(oneBreak.break2From, "");
+  assert.equal(oneBreak.break2To, "");
+});
+
+test("defaults work across a month/year boundary and ignore a deleted target record", () => {
+  const result = attendanceFormDefaults("2027-01-02", [
+    { ...complete, attendanceDate: "2026-12-31" },
+    {
+      ...complete,
+      attendanceDate: "2027-01-02",
+      status: "deleted",
+      clockIn: "11:00",
+    },
+  ]);
+  assert.equal(result.sourceDate, "2026-12-31");
+  assert.equal(result.value.attendanceDate, "2027-01-02");
+  assert.equal(result.value.clockIn, "09:00");
+  assert.equal(result.value.status, "draft");
 });

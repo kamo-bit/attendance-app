@@ -9,6 +9,7 @@ import {
   Info,
   CalendarDays,
   ArrowRight,
+  History as HistoryIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useWorkspace, WorkspaceState } from "@/components/workspace";
@@ -24,8 +25,7 @@ import { saveAttendance, updateSalarySettings } from "@/app/actions";
 import {
   type AttendanceRecord,
   type AttendanceInput,
-  blankAttendance,
-  recordToInput,
+  attendanceFormDefaults,
   localDate,
   validDate,
   dateLabel,
@@ -47,6 +47,7 @@ export default function Home() {
   const record = workspace.data.records.find(
     (r) => r.attendanceDate === date && r.status !== "deleted",
   );
+  const defaults = attendanceFormDefaults(date, workspace.data.records);
   return (
     <div className="page">
       <div className="eyebrow">AbsenKuy / Catatan harian</div>
@@ -67,6 +68,7 @@ export default function Home() {
         date={date}
         onDateChange={setDate}
         record={record}
+        defaults={defaults}
         wage={workspace.data.wage}
         holidays={workspace.data.holidays}
         reload={workspace.reload}
@@ -79,6 +81,7 @@ function AttendanceEditor({
   date,
   onDateChange,
   record,
+  defaults,
   wage,
   holidays,
   reload,
@@ -86,13 +89,12 @@ function AttendanceEditor({
   date: string;
   onDateChange: (date: string) => void;
   record?: AttendanceRecord;
+  defaults: ReturnType<typeof attendanceFormDefaults>;
   wage: number;
   holidays: string[];
   reload: () => Promise<void>;
 }) {
-  const [value, setValue] = useState<AttendanceInput>(() =>
-    record ? recordToInput(record) : blankAttendance(date),
-  );
+  const [value, setValue] = useState<AttendanceInput>(defaults.value);
   const [wageInput, setWageInput] = useState(String(wage));
   const [saving, setSaving] = useState(false);
   const [savingWage, setSavingWage] = useState(false);
@@ -169,6 +171,15 @@ function AttendanceEditor({
             </span>
             <h2>Jam kerja</h2>
           </div>
+          {defaults.sourceDate && (
+            <div className="notice mb-5">
+              <HistoryIcon />
+              <p>
+                Nilai awal dari {dateLabel(defaults.sourceDate)}. Sesuaikan jika
+                jam kerja atau istirahat tanggal ini berbeda.
+              </p>
+            </div>
+          )}
           <AttendanceFields
             value={value}
             onChange={change}

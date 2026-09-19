@@ -1,44 +1,7 @@
 "use client";
 import { Coffee, Plus, Trash2 } from "lucide-react";
 import type { AttendanceInput } from "@/lib/attendance";
-
-function TimeInput({
-  id,
-  value,
-  onChange,
-  large = false,
-  readOnly = false,
-}: {
-  id: string;
-  value: string;
-  onChange: (value: string) => void;
-  large?: boolean;
-  readOnly?: boolean;
-}) {
-  function normalize() {
-    const digits = value.replace(/[.:]/g, "");
-    if (/^\d{3,4}$/.test(digits)) {
-      const padded = digits.padStart(4, "0");
-      onChange(`${padded.slice(0, 2)}:${padded.slice(2)}`);
-    }
-  }
-  return (
-    <input
-      id={id}
-      className={`form-input ${large ? "time-input" : ""}`}
-      type="text"
-      inputMode="numeric"
-      maxLength={5}
-      placeholder="JJ:MM"
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      onBlur={normalize}
-      autoComplete="off"
-      spellCheck={false}
-      readOnly={readOnly}
-    />
-  );
-}
+import { TimeInput } from "@/components/time-input";
 
 export function AttendanceFields({
   value,
@@ -101,6 +64,8 @@ export function AttendanceFields({
           </label>
           <TimeInput
             id={`${prefix}-in`}
+            label="Jam masuk"
+            disabled={disabled}
             value={value.clockIn}
             readOnly={readOnly}
             onChange={(clockIn) => change({ clockIn })}
@@ -114,6 +79,8 @@ export function AttendanceFields({
           </label>
           <TimeInput
             id={`${prefix}-out`}
+            label="Jam pulang"
+            disabled={disabled}
             value={value.clockOut}
             readOnly={readOnly}
             onChange={(clockOut) => change({ clockOut })}
@@ -122,8 +89,8 @@ export function AttendanceFields({
         </div>
       </div>
       <p className="field-help">
-        Format 24 jam, misalnya 09:00 atau ketik 0900. Jam pulang boleh
-        dikosongkan untuk draf.
+        Format 24 jam. Ketuk ikon jam untuk memilih waktu, atau ketik 0900 di
+        komputer. Jam pulang boleh dikosongkan untuk draf.
       </p>
       <section className="section-divider">
         <div className="break-heading">
@@ -180,6 +147,8 @@ export function AttendanceFields({
                       <label htmlFor={`${prefix}-${start}`}>Mulai</label>
                       <TimeInput
                         id={`${prefix}-${start}`}
+                        label={`Mulai istirahat ${index + 1}`}
+                        disabled={disabled}
                         value={value[start]}
                         readOnly={readOnly}
                         onChange={(time) => change({ [start]: time })}
@@ -189,6 +158,8 @@ export function AttendanceFields({
                       <label htmlFor={`${prefix}-${end}`}>Selesai</label>
                       <TimeInput
                         id={`${prefix}-${end}`}
+                        label={`Selesai istirahat ${index + 1}`}
+                        disabled={disabled}
                         value={value[end]}
                         readOnly={readOnly}
                         onChange={(time) => change({ [end]: time })}
