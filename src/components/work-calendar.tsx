@@ -1,5 +1,5 @@
 "use client";
-import { ChevronLeft, ChevronRight, Sun, Check, Circle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Sun, Check, Circle, Clock3 } from "lucide-react";
 import {
   calendarDays,
   dateLabel,
@@ -15,6 +15,7 @@ export function WorkCalendar({
   onSelect,
   holidays,
   recorded = [],
+  drafts = [],
   period,
   holidayMode = false,
 }: {
@@ -24,6 +25,7 @@ export function WorkCalendar({
   onSelect: (date: string) => void;
   holidays: string[];
   recorded?: string[];
+  drafts?: string[];
   period?: { start: string; end: string };
   holidayMode?: boolean;
 }) {
@@ -61,7 +63,8 @@ export function WorkCalendar({
         ))}
         {calendarDays(month).map((date) => {
           const holiday = holidays.includes(date),
-            record = recorded.includes(date),
+            draft = !holidayMode && drafts.includes(date),
+            record = !holidayMode && !draft && recorded.includes(date),
             today = date === localDate(),
             otherMonth = date.slice(0, 7) !== month;
           const outside = period && (date < period.start || date > period.end);
@@ -70,8 +73,9 @@ export function WorkCalendar({
             <button
               key={date}
               type="button"
-              className={`calendar-day ${outside ? "outside" : ""} ${otherMonth ? "other-month" : ""} ${record ? "recorded" : ""} ${holiday ? "holiday" : ""} ${today ? "today" : ""}`}
-              aria-label={`${dateLabel(date, true)}${today ? ", hari ini" : ""}${record ? ", tercatat" : ""}${holiday ? ", hari libur" : ""}${outside ? ", di luar periode" : ""}`}
+              className={`calendar-day ${outside ? "outside" : ""} ${otherMonth ? "other-month" : ""} ${record ? "recorded" : ""} ${holiday ? "holiday" : ""} ${draft ? "draft" : ""} ${today ? "today" : ""}`}
+              aria-label={`${dateLabel(date, true)}${today ? ", hari ini" : ""}${draft ? ", draf, belum selesai" : ""}${record ? ", absensi selesai" : ""}${holiday ? ", hari libur" : ""}${outside ? ", di luar periode" : ""}`}
+              title={draft ? "Absensi masih draf — belum selesai" : undefined}
               aria-current={today ? "date" : undefined}
               aria-pressed={chosen}
               onClick={() => onSelect(date)}
@@ -79,8 +83,9 @@ export function WorkCalendar({
               <span>{Number(date.slice(8))}</span>
               <span className="day-markers" aria-hidden="true">
                 {record && <i />}
-                {holiday && <Sun />}
-                {chosen && !holidayMode && <Check />}
+                {draft && <Clock3 />}
+                {holiday && <Sun className="holiday-marker" />}
+                {chosen && !holidayMode && !holiday && <Check />}
               </span>
             </button>
           );
@@ -99,7 +104,11 @@ export function WorkCalendar({
             </span>
             <span>
               <Circle size={7} fill="currentColor" />
-              Tercatat
+              Selesai
+            </span>
+            <span className="legend-draft">
+              <Clock3 size={12} />
+              Draf
             </span>
           </>
         )}

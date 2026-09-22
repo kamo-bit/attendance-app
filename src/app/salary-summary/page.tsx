@@ -216,7 +216,12 @@ export default function SalarySummaryPage() {
               selected={selectedDate}
               onSelect={setSelectedDate}
               holidays={holidays}
-              recorded={activeRecords.map((r) => r.attendanceDate)}
+              recorded={activeRecords
+                .filter((r) => r.status === "completed")
+                .map((r) => r.attendanceDate)}
+              drafts={activeRecords
+                .filter((r) => r.status === "draft")
+                .map((r) => r.attendanceDate)}
               period={period}
             />
             <p className="field-help mt-4">
@@ -258,6 +263,12 @@ export default function SalarySummaryPage() {
             )}
             {selectedRecord ? (
               <>
+                {selectedRecord.status === "draft" && (
+                  <p className="status draft mb-4">
+                    <Clock3 />
+                    Draf — belum selesai
+                  </p>
+                )}
                 <dl className="detail-list">
                   <div>
                     <dt>Jam kerja</dt>

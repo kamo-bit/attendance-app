@@ -53,6 +53,7 @@
   --teal-text: #146e69;
   --gold: #ffd23f;
   --gold-soft: #fff4cd;
+  --draft-text: #806000;
   --coral: #ef6c4a;
   --coral-text: #b03d23;
   --coral-soft: #fff0e9;
@@ -71,6 +72,7 @@
   --teal-text: #78ddd6;
   --gold: #ffd23f;
   --gold-soft: #3c3925;
+  --draft-text: #ffe47a;
   --coral: #ff8a6a;
   --coral-text: #ffa58c;
   --coral-soft: #402d29;
@@ -1092,6 +1094,16 @@
   background: var(--teal);
   color: #072b28;
   border: 2px solid var(--teal-text);
+}
+.calendar-day.draft {
+  background: var(--gold-soft);
+  color: var(--draft-text);
+}
+.calendar-day.draft .holiday-marker {
+  color: var(--coral-text);
+}
+.calendar-legend .legend-draft {
+  color: var(--draft-text);
 }
 .day-markers {
   min-height: 10px;
