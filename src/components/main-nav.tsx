@@ -9,9 +9,18 @@ import {
   Wallet,
   LogOut,
   Coffee,
+  Settings,
+  ChevronDown,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { ThemeToggle } from "@/components/theme-toggle";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -122,22 +131,37 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="account-tools">
               <ThemeToggle />
               {session && (
-                <>
-                  <div className="user-chip">
-                    <span className="avatar">
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    className="profile-menu-trigger"
+                    aria-label="Menu akun"
+                    title="Menu akun"
+                  >
+                    <span className="avatar" aria-hidden="true">
                       {session.user.name?.charAt(0).toUpperCase() || "A"}
                     </span>
-                    <span>{session.user.name}</span>
-                  </div>
-                  <button
-                    className="icon-button"
-                    aria-label="Keluar dari akun"
-                    title="Keluar dari akun"
-                    onClick={() => setLogoutOpen(true)}
-                  >
-                    <LogOut aria-hidden="true" />
-                  </button>
-                </>
+                    <span className="profile-menu-name">{session.user.name}</span>
+                    <ChevronDown className="profile-menu-chevron" aria-hidden="true" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" sideOffset={8} className="account-menu">
+                    <div className="account-menu-heading">
+                      <strong>{session.user.name}</strong>
+                      <span>{session.user.email}</span>
+                    </div>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      render={<Link href="/settings" />}
+                      aria-current={pathname === "/settings" ? "page" : undefined}
+                    >
+                      <Settings aria-hidden="true" />
+                      Pengaturan
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setLogoutOpen(true)}>
+                      <LogOut aria-hidden="true" />
+                      Keluar dari akun
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
             </div>
           </header>

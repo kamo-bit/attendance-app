@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { attendanceRecords, users } from '@/db/schema';
-import { eq, and, gte, lte } from 'drizzle-orm';
+import { attendanceRecords, userPreferences, users } from '@/db/schema';
+import { eq, and, gte, lte, or, isNull } from 'drizzle-orm';
 import { getPayrollPeriod } from '@/lib/utils';
 import { Resend } from 'resend';
 import { render, toPlainText } from '@react-email/render';
@@ -16,9 +16,6 @@ function formatMinutes(minutes: number): string {
 }
 
 export async function GET(request: Request) {
-  // Initialize Resend with the API key from environment variables
-  const resend = new Resend(process.env.RESEND_API_KEY);
-
   // Check for the cron secret to secure the route
   const authHeader = request.headers.get('authorization');
   if (
@@ -49,9 +46,15 @@ export async function GET(request: Request) {
 
     const { start, end } = getPayrollPeriod(dateStr);
 
-    // Fetch all users
-    const allUsers = await db.select().from(users);
+    const resend = new Resend(process.env.RESEND_API_KEY);
+
+    // Existing accounts without a preference keep receiving their summaries.
+    const allUsers = await db.select({ id: users.id, name: users.name, email: users.email })
+      .from(users)
+      .leftJoin(userPreferences, eq(users.id, userPreferences.userId))
+      .where(or(isNull(userPreferences.userId), eq(userPreferences.salaryEmailEnabled, true)));
     let sentCount = 0;
+    let failedCount = 0;
 
     for (const user of allUsers) {
       if (!user.email) continue;
@@ -129,22 +132,38 @@ export async function GET(request: Request) {
         })
       );
 
-      // Send the email summary
-      await resend.emails.send({
-        from: 'Admin Absensi <admin@absenkuy.cc>',
-        to: user.email,
-        subject: `Ringkasan Pendapatan — ${periodLabel}`,
-        html: emailHtml,
-        text: toPlainText(emailHtml),
-      });
-      sentCount++;
+      // Honor an opt-out made while this cron run was preparing the summary.
+      const [latestPreference] = await db.select({ enabled: userPreferences.salaryEmailEnabled })
+        .from(userPreferences).where(eq(userPreferences.userId, user.id)).limit(1);
+      if (latestPreference?.enabled === false) continue;
+
+      try {
+        const result = await resend.emails.send({
+          from: 'Admin Absensi <admin@absenkuy.cc>',
+          to: user.email,
+          subject: `Ringkasan Pendapatan — ${periodLabel}`,
+          html: emailHtml,
+          text: toPlainText(emailHtml),
+        });
+        // Resend can return a delivery error without throwing.
+        if (result.error || !result.data?.id) {
+          failedCount++;
+          console.error('Salary summary email was not accepted by the email provider.');
+        } else {
+          sentCount++;
+        }
+      } catch {
+        failedCount++;
+        console.error('Salary summary email could not be sent.');
+      }
     }
 
     return NextResponse.json({
-      success: true,
-      message: `Emails sent successfully for period ${start} to ${end}`,
+      success: failedCount === 0,
+      message: `Salary email run finished for period ${start} to ${end}`,
       sentCount,
-    });
+      failedCount,
+    }, { status: failedCount === 0 ? 200 : 500 });
   } catch (error) {
     console.error('Error sending salary emails:', error);
     return NextResponse.json({

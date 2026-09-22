@@ -17,7 +17,10 @@ import {
 } from "@/lib/attendance";
 
 async function getUser() {
-  const session = await auth.api.getSession({ headers: await headers() });
+  const session = await auth.api.getSession({
+    headers: await headers(),
+    query: { disableCookieCache: true },
+  });
   if (!session?.user) throw new Error("Sesi berakhir. Silakan masuk kembali.");
   return session.user;
 }

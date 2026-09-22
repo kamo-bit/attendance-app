@@ -3,6 +3,12 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 import { Resend } from "resend";
+import { APIError } from "better-auth/api";
+import { profileNameError } from "@/lib/user-settings";
+
+const escapeEmailText = (value: string) => value.replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+}[character]!));
 
 const resetPasswordEmailHtml = (userName: string, resetUrl: string) => `
 <!DOCTYPE html>
@@ -28,7 +34,7 @@ const resetPasswordEmailHtml = (userName: string, resetUrl: string) => `
           <tr>
             <td style="padding:36px 40px;">
               <p style="margin:0 0 16px;font-size:16px;color:#334155;line-height:1.6;">
-                Halo <strong>${userName}</strong>,
+                Halo <strong>${escapeEmailText(userName)}</strong>,
               </p>
               <p style="margin:0 0 24px;font-size:15px;color:#475569;line-height:1.6;">
                 Kami menerima permintaan untuk mengatur ulang kata sandi akun AbsenKuy kamu. Klik tombol di bawah untuk membuat kata sandi baru.
@@ -82,6 +88,18 @@ const resetPasswordEmailHtml = (userName: string, resetUrl: string) => `
 `;
 
 export const auth = betterAuth({
+    databaseHooks: {
+        user: {
+            update: {
+                before: async (user) => {
+                    if (user.name === undefined) return;
+                    const error = profileNameError(user.name);
+                    if (error) throw new APIError("BAD_REQUEST", { code: "INVALID_NAME", message: error });
+                    return { data: { ...user, name: user.name.trim() } };
+                },
+            },
+        },
+    },
     baseURL: process.env.BETTER_AUTH_URL 
         || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000"),
     trustedOrigins: [
@@ -96,8 +114,8 @@ export const auth = betterAuth({
         expiresIn: 60 * 60 * 24 * 365, // 1 year
         updateAge: 60 * 60 * 24,
         cookieCache: {
-            enabled: true,
-            maxAge: 5 * 60
+            // Password changes must immediately revoke access on other devices.
+            enabled: false,
         }
     },
     database: drizzleAdapter(db, {
