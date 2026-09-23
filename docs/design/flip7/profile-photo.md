@@ -32,6 +32,8 @@ Migrasi dapat dijalankan kembali tanpa menghapus foto. Tidak perlu mengganti env
 
 Konversi berjalan pada runtime Node.js. `sharp` dipasang langsung pada versi 0.35.4; `libheif-js/wasm-bundle` menangani HEIC tanpa binary sistem tambahan. `libheif-js` dikecualikan dari bundling Next.js agar modul WASM tersemat tetap dapat dimuat.
 
+Override npm menyamakan versi `sharp` milik aplikasi dan Next.js. Dua versi binary libvips yang berbeda dapat menyebabkan fungsi gagal dimuat di Vercel meskipun build berhasil; kasus serupa dijelaskan dalam [diskusi resmi Next.js](https://github.com/vercel/next.js/discussions/95130).
+
 ## Pengujian
 
 - `npm test`: decoder berbagai format serta route dengan SQLite terisolasi, batas ukuran termasuk streaming, autentikasi/origin, isolasi akun, pratinjau tanpa penyimpanan, rollback transaksi, dan pencabutan sesi.
