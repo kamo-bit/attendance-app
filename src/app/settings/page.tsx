@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useTheme } from "next-themes";
 import {
   BellRing,
+  Camera,
   Check,
   CheckCircle2,
   Eye,
@@ -26,6 +27,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import { UserAvatar } from "@/components/user-avatar";
 import { passwordChangeError, profileNameError } from "@/lib/user-settings";
 import { updateSalarySettings } from "@/app/actions";
 import { getUserSettings, saveEmailPreference } from "./actions";
@@ -176,6 +178,7 @@ function ProfileSection({ settings, refreshSession }: { settings: UserSettings; 
   return (
     <section className="panel settings-card" aria-labelledby="settings-profile-title">
       <SectionHeading id="settings-profile-title" icon={<UserRound />} title="Profil" description="Identitas yang tampil di akun AbsenKuy." />
+      <ProfilePhoto initialImage={settings.image} name={savedName} refreshSession={refreshSession} />
       <form className="settings-form" onSubmit={save} noValidate>
         <div className="field">
           <label htmlFor="settings-name">Nama lengkap</label>
@@ -198,6 +201,167 @@ function ProfileSection({ settings, refreshSession }: { settings: UserSettings; 
         <div className="settings-form-footer"><SaveButton busy={busy} disabled={name.trim() === savedName}>Simpan profil</SaveButton></div>
       </form>
     </section>
+  );
+}
+
+const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
+
+async function photoResponseError(response: Response, fallback: string) {
+  if (response.status === 413) return "Ukuran foto maksimal 2 MB. Pilih foto yang lebih kecil.";
+  if (response.status === 401) return "Sesi berakhir. Silakan masuk kembali untuk mengubah foto.";
+  const result: unknown = await response.json().catch(() => null);
+  return result && typeof result === "object" && "error" in result && typeof result.error === "string"
+    ? result.error
+    : fallback;
+}
+
+function ProfilePhoto({ initialImage, name, refreshSession }: {
+  initialImage: string | null;
+  name: string;
+  refreshSession: () => Promise<void>;
+}) {
+  const [currentImage, setCurrentImage] = useState(initialImage);
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [phase, setPhase] = useState<"idle" | "previewing" | "saving">("idle");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const fileInput = useRef<HTMLInputElement>(null);
+  const controller = useRef<AbortController | null>(null);
+  const requestId = useRef(0);
+  const previewUrl = useRef<string | null>(null);
+  const active = useActive();
+
+  useEffect(() => () => {
+    requestId.current += 1;
+    controller.current?.abort();
+    if (previewUrl.current) URL.revokeObjectURL(previewUrl.current);
+  }, []);
+
+  function clearPreview() {
+    if (previewUrl.current) URL.revokeObjectURL(previewUrl.current);
+    previewUrl.current = null;
+    setPreview(null);
+  }
+
+  function cancel() {
+    if (phase === "saving") return;
+    requestId.current += 1;
+    controller.current?.abort();
+    clearPreview();
+    setFile(null);
+    setPhase("idle");
+    setError("");
+    setSuccess("");
+  }
+
+  async function selectPhoto(nextFile: File) {
+    controller.current?.abort();
+    const id = ++requestId.current;
+    clearPreview();
+    setFile(null);
+    setError("");
+    setSuccess("");
+    setPhase("idle");
+    if (nextFile.size > MAX_PHOTO_BYTES) {
+      setError("Ukuran foto maksimal 2 MB. Pilih foto yang lebih kecil.");
+      return;
+    }
+    if (nextFile.size === 0) {
+      setError("File foto kosong. Pilih foto lain.");
+      return;
+    }
+    const request = new AbortController();
+    controller.current = request;
+    setFile(nextFile);
+    setPhase("previewing");
+    try {
+      const response = await fetch("/api/profile-photo", {
+        method: "POST",
+        headers: { "Content-Type": "application/octet-stream" },
+        body: nextFile,
+        signal: request.signal,
+      });
+      if (!response.ok) throw new Error(await photoResponseError(response, "Foto belum bisa diproses. Pilih foto lain atau coba lagi."));
+      if (response.headers.get("content-type")?.split(";")[0].trim() !== "image/webp")
+        throw new Error("Pratinjau foto tidak valid. Silakan coba lagi.");
+      const blob = await response.blob();
+      if (!active.current || id !== requestId.current) return;
+      if (!blob.size) throw new Error("Pratinjau foto kosong. Silakan pilih foto lain.");
+      const url = URL.createObjectURL(blob);
+      previewUrl.current = url;
+      setPreview(url);
+    } catch (cause) {
+      if (!active.current || id !== requestId.current || request.signal.aborted) return;
+      setFile(null);
+      setError(cause instanceof Error && cause.name !== "TypeError" ? cause.message : "Pratinjau belum bisa dimuat. Periksa koneksi lalu pilih foto lagi.");
+    } finally {
+      if (active.current && id === requestId.current) setPhase("idle");
+    }
+  }
+
+  async function savePhoto(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!file || !preview || phase !== "idle") return;
+    controller.current?.abort();
+    const id = ++requestId.current;
+    const request = new AbortController();
+    controller.current = request;
+    setPhase("saving");
+    setError("");
+    setSuccess("");
+    try {
+      const response = await fetch("/api/profile-photo", {
+        method: "PUT",
+        headers: { "Content-Type": "application/octet-stream" },
+        body: file,
+        signal: request.signal,
+      });
+      if (!response.ok) throw new Error(await photoResponseError(response, "Foto belum tersimpan. Silakan coba lagi."));
+      const result: unknown = await response.json();
+      if (!active.current || id !== requestId.current) return;
+      if (!result || typeof result !== "object" || !("image" in result) || typeof result.image !== "string")
+        throw new Error("Status foto belum dapat dipastikan. Muat ulang halaman sebelum mencoba lagi.");
+      setCurrentImage(result.image);
+      clearPreview();
+      setFile(null);
+      setSuccess("Foto profil berhasil diperbarui.");
+      await refreshSession().catch(() => {
+        if (active.current && id === requestId.current)
+          setSuccess("Foto profil berhasil disimpan. Muat ulang halaman jika foto di menu akun belum berubah.");
+      });
+    } catch (cause) {
+      if (!active.current || id !== requestId.current || request.signal.aborted) return;
+      setError(cause instanceof Error && cause.name !== "TypeError" ? cause.message : "Foto belum tersimpan. Periksa koneksi lalu coba lagi.");
+    } finally {
+      if (active.current && id === requestId.current) setPhase("idle");
+    }
+  }
+
+  return (
+    <form className="settings-photo-form" onSubmit={savePhoto} aria-labelledby="settings-photo-title">
+      <div className="settings-photo-row">
+        <UserAvatar image={preview || currentImage} name={name} className="settings-photo-avatar" label={preview ? "Pratinjau foto profil baru" : "Foto profil saat ini"} />
+        <div className="settings-photo-content">
+          <h3 id="settings-photo-title">Foto profil</h3>
+          <p className="field-help" id="settings-photo-help">Maksimal 2 MB. Mendukung JPG, PNG, WebP, HEIC, GIF, dan format gambar lainnya. GIF menjadi foto diam.</p>
+          <input ref={fileInput} id="settings-photo-file" type="file" hidden accept="image/*,.heic,.heif,.tif,.tiff,.bmp,.ico" disabled={phase === "saving"} onChange={(event) => {
+            const selected = event.target.files?.[0];
+            event.target.value = "";
+            if (selected) void selectPhoto(selected);
+          }} />
+          <button type="button" className="btn btn-secondary settings-photo-choose" aria-describedby="settings-photo-help" disabled={phase === "saving"} onClick={() => fileInput.current?.click()}><Camera aria-hidden="true" />{file ? "Pilih foto lain" : "Pilih foto"}</button>
+        </div>
+      </div>
+      {file && <p className="settings-photo-file-name">{file.name} <span>· {(file.size / 1024 / 1024).toLocaleString("id-ID", { maximumFractionDigits: 2 })} MB</span></p>}
+      {phase === "previewing" && <p className="settings-photo-progress" role="status"><LoaderCircle className="settings-spinner" aria-hidden="true" />Menyiapkan pratinjau foto…</p>}
+      {preview && <p className="field-help">Pratinjau foto baru. Pilih Simpan foto untuk menerapkannya ke akunmu.</p>}
+      <Feedback id="photo-feedback" error={error} success={success} />
+      {file && <div className="settings-photo-actions">
+        <button type="button" className="btn btn-outline" disabled={phase === "saving"} onClick={cancel}>Batalkan</button>
+        <SaveButton busy={phase === "saving"} disabled={!preview || phase === "previewing"}>Simpan foto</SaveButton>
+      </div>}
+    </form>
   );
 }
 

@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, check } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, check, blob } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
 export const users = sqliteTable("users", {
@@ -83,6 +83,13 @@ export const userPreferences = sqliteTable("user_preferences", {
   salaryEmailEnabled: integer("salary_email_enabled", { mode: "boolean" }).notNull().default(true),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`(strftime('%s', 'now'))`),
 }, (table) => [check("user_preferences_salary_email_enabled_check", sql`${table.salaryEmailEnabled} in (0, 1)`)]);
+
+export const profilePhotos = sqliteTable("profile_photos", {
+  userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  data: blob("data", { mode: "buffer" }).notNull(),
+  version: text("version").notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`(strftime('%s', 'now'))`),
+});
 
 export const holidays = sqliteTable("holidays", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),

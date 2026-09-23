@@ -2,6 +2,7 @@ export type UserSettings = {
   name: string;
   email: string;
   emailVerified: boolean;
+  image: string | null;
   providers: string[];
   hasPassword: boolean;
   wage: number;

@@ -20,7 +20,7 @@ async function authenticatedUserId() {
 export async function getUserSettings(): Promise<UserSettings> {
   const userId = await authenticatedUserId();
   const [[user], linkedAccounts, [salary], [preferences]] = await Promise.all([
-    db.select({ name: users.name, email: users.email, emailVerified: users.emailVerified })
+    db.select({ name: users.name, email: users.email, emailVerified: users.emailVerified, image: users.image })
       .from(users).where(eq(users.id, userId)).limit(1),
     db.select({
       providerId: accounts.providerId,

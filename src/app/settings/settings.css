@@ -19,6 +19,18 @@
 .settings-form-footer { display: flex; justify-content: flex-end; gap: 16px; align-items: center; padding-top: 20px; border-top: 1px solid var(--border); }
 .settings-form-footer .btn { min-height: 46px; }
 .settings-readonly { background: var(--soft); color: var(--muted-foreground); }
+.settings-photo-form { display: grid; gap: 14px; padding-bottom: 22px; border-bottom: 1px solid var(--border); min-width: 0; }
+.settings-photo-row { display: flex; gap: 18px; align-items: flex-start; min-width: 0; }
+.settings-photo-avatar { width: 88px; height: 88px; font-size: 32px; font-weight: 750; border: 3px solid var(--card); box-shadow: 0 0 0 1px var(--border); }
+.settings-photo-content { display: grid; justify-items: start; gap: 8px; min-width: 0; flex: 1; }
+.settings-photo-content h3 { font-size: 15px; }
+.settings-photo-choose { margin-top: 4px; min-height: 44px; }
+.settings-photo-file-name { font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
+.settings-photo-file-name span { color: var(--muted-foreground); font-weight: 400; }
+.settings-photo-progress { display: flex; align-items: center; gap: 8px; color: var(--teal-text); font-size: 13px; }
+.settings-photo-progress svg { width: 17px; height: 17px; }
+.settings-photo-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.settings-photo-actions .btn { min-height: 44px; }
 .settings-login-methods { display: grid; gap: 10px; }
 .settings-badges { display: flex; flex-wrap: wrap; gap: 8px; }
 .settings-badge { display: inline-flex; gap: 7px; align-items: center; font-size: 12px; font-weight: 650; padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--shape-control); background: var(--soft); color: var(--teal-text); }
@@ -66,5 +78,9 @@
   .settings-form-footer .btn { width: 100%; }
   .settings-security-footer { flex-direction: column-reverse; align-items: center; }
   .settings-theme-options { gap: 8px; }
+  .settings-photo-row { gap: 14px; }
+  .settings-photo-avatar { width: 72px; height: 72px; font-size: 28px; }
+  .settings-photo-actions .btn { flex: 1 1 auto; }
 }
+@media (max-width: 360px) { .settings-photo-row { flex-direction: column; } }
 @media (prefers-reduced-motion: reduce) { .settings-toggle > span { transition: none; } .settings-spinner { animation: none; } }

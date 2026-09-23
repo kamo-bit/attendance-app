@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { UserAvatar } from "@/components/user-avatar";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -137,9 +138,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     aria-label="Menu akun"
                     title="Menu akun"
                   >
-                    <span className="avatar" aria-hidden="true">
-                      {session.user.name?.charAt(0).toUpperCase() || "A"}
-                    </span>
+                    <UserAvatar key={session.user.id} name={session.user.name} image={session.user.image} />
                     <span className="profile-menu-name">{session.user.name}</span>
                     <ChevronDown className="profile-menu-chevron" aria-hidden="true" />
                   </DropdownMenuTrigger>

@@ -46,7 +46,7 @@ async function fixture(t) {
   const client = createClient({ url: "file::memory:" });
   t.after(() => client.close());
   await client.executeMultiple(`
-    CREATE TABLE users (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL, email_verified INTEGER NOT NULL);
+    CREATE TABLE users (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL, email_verified INTEGER NOT NULL, image TEXT);
     CREATE TABLE accounts (user_id TEXT NOT NULL, provider_id TEXT NOT NULL, password TEXT);
     CREATE TABLE salary_settings (user_id TEXT NOT NULL, hourly_wage_yen INTEGER NOT NULL);
     CREATE TABLE attendance_records (
@@ -55,7 +55,7 @@ async function fixture(t) {
       work_minutes INTEGER, hourly_wage_yen INTEGER, estimated_salary_yen INTEGER,
       payroll_period_start TEXT, payroll_period_end TEXT, status TEXT, created_at INTEGER, updated_at INTEGER
     );
-    INSERT INTO users VALUES ('one', 'Fresh Name', 'one@example.test', 1), ('two', 'Second User', 'two@example.test', 0);
+    INSERT INTO users VALUES ('one', 'Fresh Name', 'one@example.test', 1, NULL), ('two', 'Second User', 'two@example.test', 0, NULL);
     INSERT INTO accounts VALUES ('one', 'credential', 'private-hash'), ('one', 'google', NULL), ('two', 'google', NULL);
     INSERT INTO salary_settings VALUES ('one', 1300);
   `);
@@ -79,12 +79,12 @@ async function fixture(t) {
 test("settings read fresh profile/provider data and default missing preference to enabled without exposing credentials", async (t) => {
   const { actions, asUser } = await fixture(t);
   assert.deepEqual(await actions.getUserSettings(), {
-    name: "Fresh Name", email: "one@example.test", emailVerified: true,
+    name: "Fresh Name", email: "one@example.test", emailVerified: true, image: null,
     providers: ["credential", "google"], hasPassword: true, wage: 1300, salaryEmailEnabled: true,
   });
   asUser("two");
   assert.deepEqual(await actions.getUserSettings(), {
-    name: "Second User", email: "two@example.test", emailVerified: false,
+    name: "Second User", email: "two@example.test", emailVerified: false, image: null,
     providers: ["google"], hasPassword: false, wage: 1115, salaryEmailEnabled: true,
   });
 });

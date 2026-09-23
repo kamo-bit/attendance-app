@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ["libheif-js"],
   experimental: {
     serverActions: {
       allowedOrigins: ["localhost:3000", "absenkuy.cc", "www.absenkuy.cc"],
