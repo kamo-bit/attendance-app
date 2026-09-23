@@ -34,6 +34,8 @@ Konversi berjalan pada runtime Node.js. `sharp` dipasang langsung pada versi 0.3
 
 Override npm menyamakan versi `sharp` milik aplikasi dan Next.js. Dua versi binary libvips yang berbeda dapat menyebabkan fungsi gagal dimuat di Vercel meskipun build berhasil; kasus serupa dijelaskan dalam [diskusi resmi Next.js](https://github.com/vercel/next.js/discussions/95130).
 
+Route foto juga menyertakan paket native `@img/sharp-*` secara eksplisit melalui `outputFileTracingIncludes`. Tracing entry ESM Sharp pada Next.js 16.2.6 dapat melewatkan binary Linux dan pustaka libvips. Pola ini hanya menyertakan paket platform yang terpasang saat build dan hanya berlaku pada `/api/profile-photo`.
+
 ## Pengujian
 
 - `npm test`: decoder berbagai format serta route dengan SQLite terisolasi, batas ukuran termasuk streaming, autentikasi/origin, isolasi akun, pratinjau tanpa penyimpanan, rollback transaksi, dan pencabutan sesi.
