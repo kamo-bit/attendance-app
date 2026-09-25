@@ -27,6 +27,15 @@
 - Petunjuk dan jarak antarbagian diringkas. Tarif ditampilkan sebagai informasi; tautan Ubah tarif default di Pengaturan membuka langsung bagian Pengaturan kerja setelah data akun selesai dimuat. Catatan/draf yang sudah tersimpan tetap memakai tarif aslinya.
 - QA dengan database lokal: validasi jam pulang kosong, simpan draf dan muat ulang, selesaikan absensi dan muat ulang, pembatalan konfirmasi hari libur, popup jam, tautan pengaturan tarif, serta tema terang/gelap. Layout diperiksa pada 320×740, 360×780, 390×844, 430×932, 667×375, 768×1024, 1024×768, dan 1280×800 tanpa overflow horizontal. Pengujian memakai viewport browser, bukan perangkat fisik.
 
+## Edit langsung dari Absensi dan Riwayat
+
+- Absensi yang sudah selesai memiliki tombol Ubah catatan di atas formulir. Draf tetap dapat diisi langsung. Riwayat menyediakan Ubah catatan pada tabel desktop dan kartu mobile untuk catatan aktif, termasuk draf; catatan dihapus tidak memiliki tindakan edit.
+- Kedua halaman menggunakan komponen EditAttendance yang sama dengan Pendapatan. Formulir memuat tanggal, jam kerja, dan istirahat tersimpan. Validasi tanggal duplikat serta perhitungan dengan tarif asli tetap melalui updateAttendance.
+- Penyimpanan memperbarui data pada halaman asal. Di Absensi, tanggal terpilih dan parameter URL mengikuti tanggal hasil edit sehingga muat ulang tetap membuka catatan yang sama. Filter dan halaman Riwayat tetap dipertahankan; posisi catatan dapat berubah sesuai waktu pembaruan atau keluar dari filter.
+- Fokus keyboard kembali ke pemicu ketika membatalkan. Setelah menyimpan di Riwayat, fokus menuju judul daftar karena baris dapat berpindah atau hilang dari filter. Absensi memakai tombol edit baru atau judul halaman bila catatan berubah menjadi draf.
+- QA database lokal: edit jam pulang dan perhitungan otomatis; muat ulang; perubahan tanggal; penolakan tanggal duplikat; pembatalan tanpa perubahan; tarif tersimpan ¥1.200 tetap dipakai meskipun tarif akun ¥1.300; mempertahankan filter; menyelesaikan draf melalui popup mobile; mengembalikan catatan selesai menjadi draf dan menampilkan kembali bilah simpan; tidak ada tindakan edit untuk catatan dihapus.
+- Tampilan diperiksa pada lebar 320, 390, 667 (lanskap), 768, 1024, 1200, 1280, dan 1440 px, termasuk tema terang/gelap. Tidak ada overflow horizontal; dialog dapat digulir pada layar pendek. Pemeriksaan menggunakan viewport browser, bukan perangkat fisik. Seluruh 56 tes, lint, dan build produksi lulus.
+
 ## Validasi lokal
 
 - 19 tes domain dan pemilih jam lulus, termasuk pemilihan tanggal sumber, draf/riwayat dihapus, dua istirahat, batas tahun, 24 jam, 60 posisi menit, area tengah jarum, dan validasi input manual.

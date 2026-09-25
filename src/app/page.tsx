@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, type RefObject } from "react";
 import Link from "next/link";
 import {
   Clock3,
@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Save,
   CalendarDays,
+  Pencil,
   ArrowRight,
   History as HistoryIcon,
 } from "lucide-react";
@@ -14,6 +15,7 @@ import { toast } from "sonner";
 import { useWorkspace, WorkspaceState } from "@/components/workspace";
 import { AttendanceFields } from "@/components/attendance-fields";
 import { AttendanceSaveBar } from "@/components/attendance-save-bar";
+import { EditAttendance } from "@/components/edit-attendance";
 import {
   Dialog,
   DialogContent,
@@ -38,10 +40,19 @@ import {
 export default function Home() {
   const workspace = useWorkspace();
   const [date, setDate] = useState("");
+  const [editing, setEditing] = useState<AttendanceRecord | null>(null);
+  const editTrigger = useRef<HTMLButtonElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get("date");
     setDate(requested && validDate(requested) ? requested : localDate());
   }, []);
+  function selectDate(nextDate: string) {
+    setDate(nextDate);
+    const url = new URL(window.location.href);
+    url.searchParams.set("date", nextDate);
+    window.history.replaceState(null, "", url.toString());
+  }
   if (workspace.loading || workspace.error || !workspace.data || !date)
     return <WorkspaceState error={workspace.error} retry={workspace.retry} />;
   const record = workspace.data.records.find(
@@ -53,7 +64,9 @@ export default function Home() {
       <div className="eyebrow">AbsenKuy / Catatan harian</div>
       <header className="page-heading">
         <div>
-          <h1>{date === localDate() ? "Absensi hari ini" : "Catat absensi"}</h1>
+          <h1 ref={heading} tabIndex={-1}>
+            {date === localDate() ? "Absensi hari ini" : "Catat absensi"}
+          </h1>
           <p>
             Catat jam kerja dan lihat estimasi pendapatan.
           </p>
@@ -66,13 +79,26 @@ export default function Home() {
       <AttendanceEditor
         key={`${date}-${record?.updatedAt || "new"}`}
         date={date}
-        onDateChange={setDate}
+        onDateChange={selectDate}
         record={record}
         defaults={defaults}
         wage={workspace.data.wage}
         holidays={workspace.data.holidays}
         reload={workspace.reload}
+        onEdit={setEditing}
+        editTrigger={editTrigger}
       />
+      {editing && (
+        <EditAttendance
+          record={editing}
+          onClose={() => setEditing(null)}
+          returnFocus={() => editTrigger.current ?? heading.current}
+          onSaved={async (savedDate) => {
+            await workspace.reload();
+            selectDate(savedDate);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -85,6 +111,8 @@ function AttendanceEditor({
   wage,
   holidays,
   reload,
+  onEdit,
+  editTrigger,
 }: {
   date: string;
   onDateChange: (date: string) => void;
@@ -93,6 +121,8 @@ function AttendanceEditor({
   wage: number;
   holidays: string[];
   reload: () => Promise<void>;
+  onEdit: (record: AttendanceRecord) => void;
+  editTrigger: RefObject<HTMLButtonElement | null>;
 }) {
   const [value, setValue] = useState<AttendanceInput>(defaults.value);
   const [saving, setSaving] = useState(false);
@@ -146,11 +176,22 @@ function AttendanceEditor({
     <>
       <div className="attendance-grid">
         <section className="panel attendance-form-panel">
-          <div className="panel-title">
-            <span className="icon-tile">
-              <Clock3 />
-            </span>
-            <h2>Jam kerja</h2>
+          <div className="attendance-form-heading">
+            <div className="panel-title mb-0">
+              <span className="icon-tile">
+                <Clock3 />
+              </span>
+              <h2>Jam kerja</h2>
+            </div>
+            {complete && (
+              <button
+                ref={editTrigger}
+                className="btn btn-secondary"
+                onClick={() => onEdit(record)}
+              >
+                <Pencil aria-hidden="true" /> Ubah catatan
+              </button>
+            )}
           </div>
           {defaults.sourceDate && (
             <div className="notice attendance-source">
@@ -169,16 +210,10 @@ function AttendanceEditor({
           {complete && (
             <div className="notice mt-5">
               <CheckCircle2 />
-              <div>
-                Absensi tanggal ini sudah selesai.{" "}
-                <Link
-                  className="inline-link"
-                  href={`/salary-summary?date=${date}`}
-                >
-                  Ubah melalui Pendapatan
-                </Link>
-                .
-              </div>
+              <span>
+                Absensi tanggal ini sudah selesai. Pilih Ubah catatan untuk
+                memperbaruinya.
+              </span>
             </div>
           )}
           {record?.status === "draft" && (

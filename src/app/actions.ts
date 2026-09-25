@@ -130,7 +130,7 @@ export async function saveAttendance(data: AttendanceInput) {
   if (existing?.status === "completed")
     return {
       error:
-        "Absensi tanggal ini sudah selesai. Ubah melalui halaman Pendapatan.",
+        "Absensi tanggal ini sudah selesai. Gunakan Ubah catatan untuk memperbaruinya.",
     };
   const settings = await settingsFor(user.id);
   const values = recordValues(

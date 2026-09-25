@@ -24,10 +24,12 @@ export function EditAttendance({
   record,
   onClose,
   onSaved,
+  returnFocus,
 }: {
   record: AttendanceRecord;
   onClose: () => void;
   onSaved: (date: string) => Promise<void>;
+  returnFocus?: () => HTMLElement | null;
 }) {
   const [value, setValue] = useState(() => recordToInput(record));
   const [error, setError] = useState("");
@@ -62,7 +64,7 @@ export function EditAttendance({
   }
   return (
     <Dialog open onOpenChange={(open) => !open && !busy && onClose()}>
-      <DialogContent className="dialog-panel">
+      <DialogContent className="dialog-panel" finalFocus={returnFocus}>
         <DialogHeader>
           <DialogTitle>Ubah absensi</DialogTitle>
           <DialogDescription>

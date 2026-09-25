@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
 import {
   ArrowUpRight,
@@ -7,6 +7,7 @@ import {
   ChevronRight,
   History,
   Info,
+  Pencil,
   SearchX,
 } from "lucide-react";
 import {
@@ -14,6 +15,7 @@ import {
   WorkspaceState,
   StatusBadge,
 } from "@/components/workspace";
+import { EditAttendance } from "@/components/edit-attendance";
 import {
   activity,
   dateLabel,
@@ -46,6 +48,9 @@ export default function HistoryPage() {
   const [filter, setFilter] = useState("Semua");
   const [month, setMonth] = useState("");
   const [page, setPage] = useState(1);
+  const [editing, setEditing] = useState<AttendanceRecord | null>(null);
+  const editTrigger = useRef<HTMLButtonElement | null>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
   if (workspace.loading || workspace.error || !workspace.data)
     return <WorkspaceState error={workspace.error} retry={workspace.retry} />;
   const records = workspace.data.records
@@ -61,16 +66,27 @@ export default function HistoryPage() {
   const pages = Math.max(1, Math.ceil(records.length / 10));
   const currentPage = Math.min(page, pages);
   const visible = records.slice((currentPage - 1) * 10, currentPage * 10);
-  const detailLink = (record: AttendanceRecord) =>
+  const recordActions = (record: AttendanceRecord) =>
     record.status !== "deleted" ? (
-      <Link
-        href={`/salary-summary?date=${record.attendanceDate}`}
-        className="text-button"
-        aria-label={`Lihat pendapatan ${dateLabel(record.attendanceDate)}`}
-      >
-        <span className="xl:hidden">Lihat</span>
-        <ArrowUpRight />
-      </Link>
+      <div className="history-record-actions">
+        <button
+          className="text-button"
+          aria-label={`Ubah catatan ${dateLabel(record.attendanceDate)}`}
+          onClick={(event) => {
+            editTrigger.current = event.currentTarget;
+            setEditing(record);
+          }}
+        >
+          <Pencil aria-hidden="true" /> Ubah catatan
+        </button>
+        <Link
+          href={`/salary-summary?date=${record.attendanceDate}`}
+          className="text-button"
+          aria-label={`Lihat pendapatan ${dateLabel(record.attendanceDate)}`}
+        >
+          Lihat <ArrowUpRight aria-hidden="true" />
+        </Link>
+      </div>
     ) : (
       <span className="field-help">—</span>
     );
@@ -79,7 +95,9 @@ export default function HistoryPage() {
       <header className="page-heading">
         <div>
           <div className="eyebrow">AbsenKuy / Riwayat</div>
-          <h1>Riwayat absensi</h1>
+          <h1 ref={heading} tabIndex={-1}>
+            Riwayat absensi
+          </h1>
           <p>
             Diurutkan dari pembaruan terbaru. Lihat aktivitas terakhir setiap
             catatan.
@@ -162,7 +180,7 @@ export default function HistoryPage() {
                 <th>Estimasi</th>
                 <th>Aktivitas</th>
                 <th>
-                  <span className="sr-only">Lihat catatan</span>
+                  <span className="sr-only">Tindakan catatan</span>
                 </th>
               </tr>
             </thead>
@@ -190,7 +208,7 @@ export default function HistoryPage() {
                   <td>
                     <StatusBadge record={r} />
                   </td>
-                  <td>{detailLink(r)}</td>
+                  <td>{recordActions(r)}</td>
                 </tr>
               ))}
             </tbody>
@@ -231,7 +249,7 @@ export default function HistoryPage() {
                 </div>
                 <footer>
                   <small>Diperbarui {updated(r)}</small>
-                  {detailLink(r)}
+                  {recordActions(r)}
                 </footer>
               </article>
             ))}
@@ -270,6 +288,23 @@ export default function HistoryPage() {
           pendapatan.
         </p>
       </div>
+      {editing && (
+        <EditAttendance
+          record={editing}
+          onClose={() => setEditing(null)}
+          onSaved={async () => {
+            await workspace.reload();
+            // Saving can move the row outside the current filter or page.
+            editTrigger.current = null;
+          }}
+          returnFocus={() =>
+            editTrigger.current?.isConnected &&
+            editTrigger.current.getClientRects().length
+              ? editTrigger.current
+              : heading.current
+          }
+        />
+      )}
     </div>
   );
 }
