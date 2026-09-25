@@ -20,6 +20,7 @@ export function useWorkspace() {
   const [data, setData] = useState<Awaited<
     ReturnType<typeof getWorkspaceData>
   > | null>(null);
+  const [dataOwner, setDataOwner] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
   useEffect(() => {
@@ -32,6 +33,7 @@ export function useWorkspace() {
       .then((result) => {
         if (active) {
           setData(result);
+          setDataOwner(userId);
           setError("");
         }
       })
@@ -46,12 +48,13 @@ export function useWorkspace() {
   const reload = useCallback(async () => {
     const result = await getWorkspaceData();
     setData(result);
+    setDataOwner(userId ?? null);
     setError("");
-  }, []);
+  }, [userId]);
   return {
     data,
     session,
-    loading: isPending || !session || !data,
+    loading: isPending || !session || !data || dataOwner !== userId,
     error,
     reload,
     retry: () => {

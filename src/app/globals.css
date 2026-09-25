@@ -488,6 +488,35 @@
 .attendance-form-heading .panel-title {
   margin-bottom: 0;
 }
+.attendance-draft-status {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--shape-control);
+  background: var(--soft);
+  display: grid;
+  gap: 5px;
+}
+.attendance-form-panel > .attendance-draft-status {
+  margin-bottom: 18px;
+}
+.draft-status-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--teal-text);
+}
+.draft-status-heading svg {
+  flex-shrink: 0;
+}
+.draft-storage-error .draft-status-heading {
+  color: var(--coral-text);
+}
+.draft-recovery {
+  border-top: 1px dashed var(--border);
+  padding-top: 8px;
+  font-size: 12px;
+}
 .icon-tile {
   display: inline-grid;
   place-items: center;

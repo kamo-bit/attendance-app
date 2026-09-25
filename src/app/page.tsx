@@ -16,6 +16,9 @@ import { useWorkspace, WorkspaceState } from "@/components/workspace";
 import { AttendanceFields } from "@/components/attendance-fields";
 import { AttendanceSaveBar } from "@/components/attendance-save-bar";
 import { EditAttendance } from "@/components/edit-attendance";
+import { useAttendanceDraft } from "@/components/use-attendance-draft";
+import { AttendanceDraftStatus } from "@/components/attendance-draft-status";
+import { draftBase, draftTarget } from "@/lib/attendance-draft";
 import {
   Dialog,
   DialogContent,
@@ -53,7 +56,7 @@ export default function Home() {
     url.searchParams.set("date", nextDate);
     window.history.replaceState(null, "", url.toString());
   }
-  if (workspace.loading || workspace.error || !workspace.data || !date)
+  if (workspace.loading || workspace.error || !workspace.data || !workspace.session || !date)
     return <WorkspaceState error={workspace.error} retry={workspace.retry} />;
   const record = workspace.data.records.find(
     (r) => r.attendanceDate === date && r.status !== "deleted",
@@ -77,7 +80,8 @@ export default function Home() {
         </span>
       </header>
       <AttendanceEditor
-        key={`${date}-${record?.updatedAt || "new"}`}
+        key={`${workspace.session.user.id}-${draftBase(date, record)}`}
+        owner={workspace.session.user.id}
         date={date}
         onDateChange={selectDate}
         record={record}
@@ -104,6 +108,7 @@ export default function Home() {
 }
 
 function AttendanceEditor({
+  owner,
   date,
   onDateChange,
   record,
@@ -114,6 +119,7 @@ function AttendanceEditor({
   onEdit,
   editTrigger,
 }: {
+  owner: string;
   date: string;
   onDateChange: (date: string) => void;
   record?: AttendanceRecord;
@@ -124,23 +130,32 @@ function AttendanceEditor({
   onEdit: (record: AttendanceRecord) => void;
   editTrigger: RefObject<HTMLButtonElement | null>;
 }) {
-  const [value, setValue] = useState<AttendanceInput>(defaults.value);
+  const complete = record?.status === "completed";
+  const draft = useAttendanceDraft({
+    owner, target: draftTarget(date, record), base: draftBase(date, record),
+    fallbackTarget: record ? draftTarget(date) : undefined,
+    initial: defaults.value, enabled: !complete,
+  });
+  const { value } = draft;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [holidayStatus, setHolidayStatus] = useState<
     "draft" | "completed" | null
   >(null);
-  const complete = record?.status === "completed";
   const rate = record?.hourlyWageYen ?? wage;
   const { gross, rest, net } = calculateAttendance(value);
   function change(next: AttendanceInput) {
     setError("");
     if (next.attendanceDate && next.attendanceDate !== date)
       onDateChange(next.attendanceDate);
-    else setValue(next);
+    else {
+      draft.change(next);
+      // Keep this date in the URL so reopening the tab can recover its input.
+      onDateChange(date);
+    }
   }
   async function save(status: "draft" | "completed", confirmed = false) {
-    if (saving) return;
+    if (saving || !draft.ready || draft.recovery) return;
     const next = { ...value, status };
     const validation = validateAttendance(next);
     if (validation) {
@@ -153,12 +168,15 @@ function AttendanceEditor({
     }
     setSaving(true);
     setError("");
+    let savedToAccount = false;
     try {
       const result = await saveAttendance(next);
       if (result.error) {
         setError(result.error);
         return;
       }
+      savedToAccount = true;
+      draft.committed();
       toast.success(
         status === "completed"
           ? "Absensi berhasil disimpan."
@@ -166,7 +184,9 @@ function AttendanceEditor({
       );
       await reload();
     } catch {
-      setError("Absensi belum tersimpan. Periksa koneksi dan coba lagi.");
+      setError(savedToAccount
+        ? "Absensi tersimpan, tetapi tampilan belum diperbarui. Muat ulang halaman."
+        : "Absensi belum tersimpan ke akun. Periksa koneksi dan coba lagi.");
     } finally {
       setSaving(false);
       setHolidayStatus(null);
@@ -193,7 +213,8 @@ function AttendanceEditor({
               </button>
             )}
           </div>
-          {defaults.sourceDate && (
+          {!complete && <AttendanceDraftStatus draft={draft} saving={saving} />}
+          {defaults.sourceDate && !draft.dirty && (
             <div className="notice attendance-source">
               <HistoryIcon />
               <p>
@@ -204,7 +225,7 @@ function AttendanceEditor({
           <AttendanceFields
             value={value}
             onChange={change}
-            disabled={saving}
+            disabled={saving || !draft.ready || Boolean(draft.recovery)}
             readOnly={complete}
           />
           {complete && (
@@ -273,7 +294,7 @@ function AttendanceEditor({
               <ArrowRight />
             </Link>
           ) : (
-            <AttendanceSaveBar saving={saving} error={error} onSave={save} />
+            <AttendanceSaveBar saving={saving} disabled={!draft.ready || Boolean(draft.recovery)} error={error} onSave={save} />
           )}
         </section>
       </div>

@@ -1,7 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { AttendanceFields } from "@/components/attendance-fields";
+import { useAttendanceDraft } from "@/components/use-attendance-draft";
+import { AttendanceDraftStatus } from "@/components/attendance-draft-status";
+import { draftBase, draftTarget } from "@/lib/attendance-draft";
 import {
   Dialog,
   DialogContent,
@@ -31,11 +34,18 @@ export function EditAttendance({
   onSaved: (date: string) => Promise<void>;
   returnFocus?: () => HTMLElement | null;
 }) {
-  const [value, setValue] = useState(() => recordToInput(record));
+  const draft = useAttendanceDraft({
+    owner: record.userId, target: draftTarget(record.attendanceDate, record),
+    fallbackTarget: draftTarget(record.attendanceDate),
+    base: draftBase(record.attendanceDate, record), initial: recordToInput(record),
+  });
+  const { value } = draft;
+  const heading = useRef<HTMLHeadingElement>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const { gross, rest, net } = calculateAttendance(value);
   async function save() {
+    if (busy || !draft.ready || draft.recovery) return;
     const next = {
       ...value,
       status: value.clockOut ? ("completed" as const) : ("draft" as const),
@@ -47,39 +57,45 @@ export function EditAttendance({
     }
     setBusy(true);
     setError("");
+    let savedToAccount = false;
     try {
       const result = await updateAttendance(record.id, next);
       if (result.error) {
         setError(result.error);
         return;
       }
+      savedToAccount = true;
+      draft.committed();
       await onSaved(next.attendanceDate);
       toast.success("Perubahan absensi berhasil disimpan.");
       onClose();
     } catch {
-      setError("Perubahan belum tersimpan. Silakan coba lagi.");
+      setError(savedToAccount
+        ? "Perubahan tersimpan, tetapi tampilan belum diperbarui. Muat ulang halaman."
+        : "Perubahan belum tersimpan ke akun. Silakan coba lagi.");
     } finally {
       setBusy(false);
     }
   }
   return (
     <Dialog open onOpenChange={(open) => !open && !busy && onClose()}>
-      <DialogContent className="dialog-panel" finalFocus={returnFocus}>
+      <DialogContent className="dialog-panel" initialFocus={heading} finalFocus={returnFocus}>
         <DialogHeader>
-          <DialogTitle>Ubah absensi</DialogTitle>
+          <DialogTitle ref={heading} tabIndex={-1}>Ubah absensi</DialogTitle>
           <DialogDescription>
             Perbarui catatan kerja. Tarif saat dicatat tetap{" "}
             {yen(record.hourlyWageYen)}/jam.
           </DialogDescription>
         </DialogHeader>
+        <AttendanceDraftStatus draft={draft} saving={busy} />
         <AttendanceFields
           prefix="edit"
           value={value}
           onChange={(next) => {
-            setValue(next);
+            draft.change(next);
             setError("");
           }}
-          disabled={busy}
+          disabled={busy || !draft.ready || Boolean(draft.recovery)}
         />
         <div className="summary-math">
           <p>
@@ -98,9 +114,9 @@ export function EditAttendance({
         )}
         <div className="actions actions-end">
           <button className="btn btn-outline" disabled={busy} onClick={onClose}>
-            Batal
+            Tutup
           </button>
-          <button className="btn btn-primary" disabled={busy} onClick={save}>
+          <button className="btn btn-primary" disabled={busy || !draft.ready || Boolean(draft.recovery)} onClick={save}>
             {busy ? "Menyimpan…" : "Simpan perubahan"}
           </button>
         </div>

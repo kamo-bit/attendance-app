@@ -3,8 +3,9 @@
 import { useEffect, useRef } from "react";
 import { CheckCircle2, Info, Save } from "lucide-react";
 
-export function AttendanceSaveBar({ saving, error, onSave }: {
+export function AttendanceSaveBar({ saving, disabled = false, error, onSave }: {
   saving: boolean;
+  disabled?: boolean;
   error: string;
   onSave: (status: "draft" | "completed") => void;
 }) {
@@ -36,10 +37,10 @@ export function AttendanceSaveBar({ saving, error, onSave }: {
     <div className="attendance-savebar" ref={barRef} role="region" aria-label="Simpan catatan absensi" aria-busy={saving}>
       {error && <div className="notice error" role="alert"><Info aria-hidden="true" /><span>{error}</span></div>}
       <div className="attendance-save-buttons">
-        <button className="btn btn-primary" type="button" disabled={saving} onClick={() => onSave("completed")}>
+        <button className="btn btn-primary" type="button" disabled={saving || disabled} onClick={() => onSave("completed")}>
           <CheckCircle2 aria-hidden="true" /><span>{saving ? "Menyimpan…" : "Simpan absensi"}</span>
         </button>
-        <button className="btn btn-secondary" type="button" disabled={saving} onClick={() => onSave("draft")}>
+        <button className="btn btn-secondary" type="button" disabled={saving || disabled} onClick={() => onSave("draft")}>
           <Save aria-hidden="true" /><span>Simpan draf</span>
         </button>
       </div>

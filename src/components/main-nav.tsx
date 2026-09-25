@@ -30,6 +30,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { attendanceDrafts } from "@/lib/attendance-draft";
 
 export function Brand({ href = "/" }: { href?: string }) {
   return (
@@ -62,6 +63,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [date, setDate] = useState("");
+  useEffect(() => {
+    const protectDrafts = (event: BeforeUnloadEvent) => {
+      if (!attendanceDrafts.hasVolatileDrafts()) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", protectDrafts);
+    return () => window.removeEventListener("beforeunload", protectDrafts);
+  }, []);
   useEffect(() => {
     setDate(
       new Intl.DateTimeFormat("id-ID", {
