@@ -67,13 +67,11 @@ export async function updateSalarySettings(wage: number) {
       .set({ hourlyWageYen: wage, updatedAt: new Date() })
       .where(eq(salarySettings.userId, user.id));
   else
-    await db
-      .insert(salarySettings)
-      .values({
-        userId: user.id,
-        hourlyWageYen: wage,
-        effectiveFrom: localDate(),
-      });
+    await db.insert(salarySettings).values({
+      userId: user.id,
+      hourlyWageYen: wage,
+      effectiveFrom: localDate(),
+    });
   refreshPages();
   return { success: true };
 }
@@ -116,86 +114,153 @@ export async function saveAttendance(data: AttendanceInput) {
   const user = await getUser();
   const error = inputError(data);
   if (error) return { error };
-  const [existing] = await db
-    .select()
-    .from(attendanceRecords)
-    .where(
-      and(
-        eq(attendanceRecords.userId, user.id),
-        eq(attendanceRecords.attendanceDate, data.attendanceDate),
-        ne(attendanceRecords.status, "deleted"),
-      ),
-    )
-    .limit(1);
-  if (existing?.status === "completed")
-    return {
-      error:
-        "Absensi tanggal ini sudah selesai. Gunakan Ubah catatan untuk memperbaruinya.",
-    };
   const settings = await settingsFor(user.id);
-  const values = recordValues(
-    data,
-    existing?.hourlyWageYen ?? settings?.hourlyWageYen ?? 1115,
-  );
-  if (existing)
-    await db
-      .update(attendanceRecords)
-      .set({ ...values, updatedAt: new Date() })
+  // libSQL starts a write transaction before checking the date, serializing writers.
+  const result = await db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select()
+      .from(attendanceRecords)
       .where(
         and(
-          eq(attendanceRecords.id, existing.id),
           eq(attendanceRecords.userId, user.id),
+          eq(attendanceRecords.attendanceDate, data.attendanceDate),
+          ne(attendanceRecords.status, "deleted"),
         ),
-      );
-  else
-    await db.insert(attendanceRecords).values({ ...values, userId: user.id });
+      )
+      .limit(1);
+    if (existing?.status === "completed")
+      return {
+        error:
+          "Absensi tanggal ini sudah selesai. Gunakan Ubah catatan untuk memperbaruinya.",
+      };
+    const values = recordValues(
+      data,
+      existing?.hourlyWageYen ?? settings?.hourlyWageYen ?? 1115,
+    );
+    if (existing)
+      await tx
+        .update(attendanceRecords)
+        .set({ ...values, updatedAt: new Date() })
+        .where(
+          and(
+            eq(attendanceRecords.id, existing.id),
+            eq(attendanceRecords.userId, user.id),
+          ),
+        );
+    else
+      await tx.insert(attendanceRecords).values({ ...values, userId: user.id });
+    return { success: true };
+  });
+  if (result.error) return result;
   refreshPages();
-  return { success: true };
+  return result;
 }
 export async function updateAttendance(id: string, data: AttendanceInput) {
   const user = await getUser();
   const error = inputError(data);
   if (error) return { error };
-  const [existing] = await db
-    .select()
-    .from(attendanceRecords)
-    .where(
-      and(
-        eq(attendanceRecords.id, id),
-        eq(attendanceRecords.userId, user.id),
-        ne(attendanceRecords.status, "deleted"),
-      ),
-    )
-    .limit(1);
-  if (!existing)
-    return { error: "Catatan tidak ditemukan atau sudah dihapus." };
-  const [duplicate] = await db
-    .select()
-    .from(attendanceRecords)
-    .where(
-      and(
-        eq(attendanceRecords.userId, user.id),
-        eq(attendanceRecords.attendanceDate, data.attendanceDate),
-        ne(attendanceRecords.id, id),
-        ne(attendanceRecords.status, "deleted"),
-      ),
-    )
-    .limit(1);
-  if (duplicate)
-    return {
-      error: "Sudah ada catatan pada tanggal tersebut. Pilih tanggal lain.",
-    };
-  await db
-    .update(attendanceRecords)
-    .set({
-      ...recordValues(data, existing.hourlyWageYen),
-      updatedAt: new Date(),
-    })
-    .where(
-      and(eq(attendanceRecords.id, id), eq(attendanceRecords.userId, user.id)),
-    );
+  // libSQL starts a write transaction before checking the date, serializing writers.
+  const result = await db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select()
+      .from(attendanceRecords)
+      .where(
+        and(
+          eq(attendanceRecords.id, id),
+          eq(attendanceRecords.userId, user.id),
+          ne(attendanceRecords.status, "deleted"),
+        ),
+      )
+      .limit(1);
+    if (!existing)
+      return { error: "Catatan tidak ditemukan atau sudah dihapus." };
+    const [duplicate] = await tx
+      .select()
+      .from(attendanceRecords)
+      .where(
+        and(
+          eq(attendanceRecords.userId, user.id),
+          eq(attendanceRecords.attendanceDate, data.attendanceDate),
+          ne(attendanceRecords.id, id),
+          ne(attendanceRecords.status, "deleted"),
+        ),
+      )
+      .limit(1);
+    if (duplicate)
+      return {
+        error: "Sudah ada catatan pada tanggal tersebut. Pilih tanggal lain.",
+      };
+    await tx
+      .update(attendanceRecords)
+      .set({
+        ...recordValues(data, existing.hourlyWageYen),
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(attendanceRecords.id, id),
+          eq(attendanceRecords.userId, user.id),
+        ),
+      );
+    return { success: true };
+  });
+  if (result.error) return result;
   refreshPages();
-  return { success: true };
+  return result;
+}
+export async function restoreAttendance(id: string) {
+  const user = await getUser();
+  if (typeof id !== "string" || !id) return { error: "Catatan tidak valid." };
+  const result = await db.transaction(async (tx) => {
+    const [record] = await tx
+      .select()
+      .from(attendanceRecords)
+      .where(
+        and(
+          eq(attendanceRecords.id, id),
+          eq(attendanceRecords.userId, user.id),
+          eq(attendanceRecords.status, "deleted"),
+        ),
+      )
+      .limit(1);
+    if (!record)
+      return { error: "Catatan tidak ditemukan atau sudah dipulihkan." };
+    const [duplicate] = await tx
+      .select({ id: attendanceRecords.id })
+      .from(attendanceRecords)
+      .where(
+        and(
+          eq(attendanceRecords.userId, user.id),
+          eq(attendanceRecords.attendanceDate, record.attendanceDate),
+          ne(attendanceRecords.status, "deleted"),
+        ),
+      )
+      .limit(1);
+    if (duplicate)
+      return {
+        error:
+          "Tanggal ini sudah memiliki catatan aktif. Periksa catatan tersebut sebelum memulihkan catatan yang dihapus.",
+      };
+    // Deletion did not retain the previous status. Require review before adding earnings again.
+    await tx
+      .update(attendanceRecords)
+      .set({
+        status: "draft",
+        workMinutes: 0,
+        estimatedSalaryYen: 0,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(attendanceRecords.id, id),
+          eq(attendanceRecords.userId, user.id),
+        ),
+      );
+    return { success: true };
+  });
+  if (result.error) return result;
+  refreshPages();
+  return result;
 }
 export async function deleteAttendance(id: string) {
   const user = await getUser();

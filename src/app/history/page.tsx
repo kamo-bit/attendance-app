@@ -9,6 +9,7 @@ import {
   Info,
   Pencil,
   SearchX,
+  RotateCcw,
 } from "lucide-react";
 import {
   useWorkspace,
@@ -16,11 +17,18 @@ import {
   StatusBadge,
 } from "@/components/workspace";
 import { EditAttendance } from "@/components/edit-attendance";
+import { RestoreAttendance } from "@/components/restore-attendance";
 import {
-  activity,
+  defaultHistoryFilters,
+  filterAttendanceHistory,
+  historyRangeError,
+  type HistoryFilters,
+} from "@/lib/attendance-history";
+import {
   dateLabel,
   duration,
   monthLabel,
+  validDate,
   yen,
   type AttendanceRecord,
 } from "@/lib/attendance";
@@ -45,24 +53,43 @@ function updated(record: AttendanceRecord) {
 }
 export default function HistoryPage() {
   const workspace = useWorkspace();
-  const [filter, setFilter] = useState("Semua");
-  const [month, setMonth] = useState("");
+  const [filters, setFilters] = useState<HistoryFilters>(defaultHistoryFilters);
+  const [restoring, setRestoring] = useState<AttendanceRecord | null>(null);
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<AttendanceRecord | null>(null);
   const editTrigger = useRef<HTMLButtonElement | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   if (workspace.loading || workspace.error || !workspace.data)
     return <WorkspaceState error={workspace.error} retry={workspace.retry} />;
-  const records = workspace.data.records
-    .filter(
-      (r) =>
-        (!month || r.attendanceDate.startsWith(month)) &&
-        (filter === "Semua" || activity(r).label === filter),
-    )
-    .sort(
-      (a, b) =>
-        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-    );
+  const rangeError = historyRangeError(filters);
+  const records = filterAttendanceHistory(workspace.data.records, filters);
+  const hasFilters = Object.keys(defaultHistoryFilters).some(
+    (key) =>
+      filters[key as keyof HistoryFilters] !==
+      defaultHistoryFilters[key as keyof HistoryFilters],
+  );
+  function changeFilters(next: Partial<HistoryFilters>) {
+    setFilters((current) => ({ ...current, ...next }));
+    setPage(1);
+  }
+  function resetFilters() {
+    setFilters(defaultHistoryFilters);
+    setPage(1);
+    heading.current?.focus();
+  }
+  const returnFocus = () =>
+    editTrigger.current?.isConnected &&
+    editTrigger.current.getClientRects().length
+      ? editTrigger.current
+      : heading.current;
+  const dateFilterDescription = [
+    filters.month ? monthLabel(filters.month) : "",
+    validDate(filters.from) ? `Dari ${dateLabel(filters.from)}` : "",
+    validDate(filters.to) ? `Sampai ${dateLabel(filters.to)}` : "",
+    filters.activity !== "all" ? filters.activity : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const pages = Math.max(1, Math.ceil(records.length / 10));
   const currentPage = Math.min(page, pages);
   const visible = records.slice((currentPage - 1) * 10, currentPage * 10);
@@ -88,7 +115,16 @@ export default function HistoryPage() {
         </Link>
       </div>
     ) : (
-      <span className="field-help">—</span>
+      <button
+        className="text-button"
+        aria-label={`Pulihkan catatan ${dateLabel(record.attendanceDate)}`}
+        onClick={(event) => {
+          editTrigger.current = event.currentTarget;
+          setRestoring(record);
+        }}
+      >
+        <RotateCcw aria-hidden="true" /> Pulihkan
+      </button>
     );
   return (
     <div className="page">
@@ -99,71 +135,185 @@ export default function HistoryPage() {
             Riwayat absensi
           </h1>
           <p>
-            Diurutkan dari pembaruan terbaru. Lihat aktivitas terakhir setiap
-            catatan.
+            Telusuri status, tanggal kerja, dan aktivitas catatan absensimu.
           </p>
         </div>
       </header>
-      <div className="filters">
-        <div className="actions">
-          <label htmlFor="history-month" className="sr-only">
-            Filter bulan kerja
-          </label>
-          <select
-            id="history-month"
-            className="form-input"
-            value={month}
-            onChange={(e) => {
-              setMonth(e.target.value);
-              setPage(1);
-            }}
+      <section className="history-filters" aria-label="Filter riwayat absensi">
+        <div className="filters">
+          <div
+            className="filter-status"
+            role="group"
+            aria-label="Filter status absensi"
           >
-            <option value="">Semua bulan</option>
-            {[
-              ...new Set(
-                workspace.data.records.map((r) => r.attendanceDate.slice(0, 7)),
-              ),
-            ]
-              .sort()
-              .reverse()
-              .map((value) => (
-                <option key={value} value={value}>
-                  {monthLabel(value)}
-                </option>
-              ))}
-          </select>
-        </div>
-        <div className="filter-status" aria-label="Filter aktivitas">
-          {["Semua", "Dibuat", "Diubah", "Dihapus"].map((label) => (
-            <button
-              key={label}
-              aria-pressed={filter === label}
-              onClick={() => {
-                setFilter(label);
-                setPage(1);
-              }}
+            {(
+              [
+                ["all", "Semua"],
+                ["draft", "Draf"],
+                ["completed", "Selesai"],
+                ["deleted", "Dihapus"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                aria-pressed={filters.status === value}
+                onClick={() =>
+                  changeFilters({
+                    status: value,
+                    ...(value === "deleted" ? { activity: "all" } : {}),
+                  })
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <label className="history-sort">
+            Urutkan
+            <select
+              className="form-input"
+              value={filters.sort}
+              onChange={(e) =>
+                changeFilters({
+                  sort: e.target.value as HistoryFilters["sort"],
+                })
+              }
             >
-              {label}
-            </button>
-          ))}
+              <option value="date-desc">Tanggal kerja terbaru</option>
+              <option value="date-asc">Tanggal kerja terlama</option>
+              <option value="updated-desc">Pembaruan terbaru</option>
+            </select>
+          </label>
         </div>
-      </div>
+        <details className="history-filter-details">
+          <summary>
+            Filter tanggal dan aktivitas
+            {dateFilterDescription && <small>{dateFilterDescription}</small>}
+          </summary>
+          <div className="history-filter-fields">
+            <label>
+              Bulan kerja
+              <select
+                className="form-input"
+                value={filters.month}
+                onChange={(e) =>
+                  changeFilters({ month: e.target.value, from: "", to: "" })
+                }
+              >
+                <option value="">Semua bulan</option>
+                {[
+                  ...new Set(
+                    workspace.data.records.map((r) =>
+                      r.attendanceDate.slice(0, 7),
+                    ),
+                  ),
+                ]
+                  .sort()
+                  .reverse()
+                  .map((value) => (
+                    <option key={value} value={value}>
+                      {monthLabel(value)}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <label>
+              Dari tanggal
+              <input
+                className="form-input"
+                type="date"
+                value={filters.from}
+                aria-invalid={!!rangeError}
+                aria-describedby={
+                  rangeError ? "history-range-error" : undefined
+                }
+                onChange={(e) =>
+                  changeFilters({ from: e.target.value, month: "" })
+                }
+              />
+            </label>
+            <label>
+              Sampai tanggal
+              <input
+                className="form-input"
+                type="date"
+                value={filters.to}
+                aria-invalid={!!rangeError}
+                aria-describedby={
+                  rangeError ? "history-range-error" : undefined
+                }
+                onChange={(e) =>
+                  changeFilters({ to: e.target.value, month: "" })
+                }
+              />
+            </label>
+            <label>
+              Aktivitas terakhir
+              <select
+                className="form-input"
+                value={filters.activity}
+                disabled={filters.status === "deleted"}
+                onChange={(e) =>
+                  changeFilters({
+                    activity: e.target.value as HistoryFilters["activity"],
+                  })
+                }
+              >
+                <option value="all">Semua aktivitas</option>
+                <option value="Dibuat">Dibuat</option>
+                <option value="Diubah">Diubah</option>
+              </select>
+            </label>
+          </div>
+          <p className="field-help">
+            Pilih bulan atau rentang tanggal kerja. Salah satu batas tanggal
+            boleh dikosongkan.
+          </p>
+        </details>
+        {rangeError && (
+          <p id="history-range-error" role="alert" className="error-text">
+            {rangeError}
+          </p>
+        )}
+        <div className="history-filter-result">
+          <p className="field-help" role="status">
+            {rangeError
+              ? "Perbaiki rentang tanggal untuk melihat hasil."
+              : `${records.length} catatan ditemukan`}
+          </p>
+          {hasFilters && (
+            <button className="text-button" onClick={resetFilters}>
+              <RotateCcw aria-hidden="true" /> Atur ulang filter
+            </button>
+          )}
+        </div>
+      </section>
       {!visible.length ? (
         <section className="panel empty-state">
           {workspace.data.records.length ? <SearchX /> : <History />}
           <h2>
-            {workspace.data.records.length
-              ? "Tidak ada catatan yang cocok"
-              : "Belum ada catatan absensi"}
+            {rangeError
+              ? "Periksa rentang tanggal"
+              : workspace.data.records.length
+                ? "Tidak ada catatan yang cocok"
+                : "Belum ada catatan absensi"}
           </h2>
           <p>
-            {workspace.data.records.length
-              ? "Coba bulan atau filter aktivitas yang lain."
-              : "Mulai dengan mencatat jam kerja pertamamu. Catatan akan muncul di sini."}
+            {rangeError
+              ? "Perbaiki tanggal awal dan akhir pada filter di atas."
+              : workspace.data.records.length
+                ? "Coba status, rentang tanggal, atau aktivitas yang lain."
+                : "Mulai dengan mencatat jam kerja pertamamu. Catatan akan muncul di sini."}
           </p>
-          <Link href="/" className="btn btn-primary">
-            Catat absensi
-          </Link>
+          {hasFilters ? (
+            <button className="btn btn-outline" onClick={resetFilters}>
+              Atur ulang filter
+            </button>
+          ) : (
+            <Link href="/" className="btn btn-primary">
+              Catat absensi
+            </Link>
+          )}
         </section>
       ) : (
         <section
@@ -284,8 +434,8 @@ export default function HistoryPage() {
       <div className="notice mt-6">
         <Info />
         <p>
-          Catatan yang dihapus tetap ada di riwayat dan tidak dihitung dalam
-          pendapatan.
+          Catatan yang dihapus tidak dihitung dalam pendapatan. Pulihkan sebagai
+          draf, lalu periksa melalui Ubah catatan sebelum menyelesaikannya.
         </p>
       </div>
       {editing && (
@@ -297,12 +447,19 @@ export default function HistoryPage() {
             // Saving can move the row outside the current filter or page.
             editTrigger.current = null;
           }}
-          returnFocus={() =>
-            editTrigger.current?.isConnected &&
-            editTrigger.current.getClientRects().length
-              ? editTrigger.current
-              : heading.current
-          }
+          returnFocus={returnFocus}
+        />
+      )}
+      {restoring && (
+        <RestoreAttendance
+          record={restoring}
+          onClose={() => setRestoring(null)}
+          onSaved={async () => {
+            await workspace.reload();
+            editTrigger.current = null;
+            changeFilters({ status: "draft", activity: "all" });
+          }}
+          returnFocus={returnFocus}
         />
       )}
     </div>
