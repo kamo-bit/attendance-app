@@ -1,5 +1,9 @@
 # Email ringkasan pendapatan
 
+Email dijadwalkan tanggal **1 pukul 00.00 JST** dan merangkum periode yang berakhir tanggal **20 bulan sebelumnya**. Contoh: email 1 Oktober 2026 mencakup 21 Agustus–20 September 2026; email 1 Januari 2027 mencakup 21 November–20 Desember 2026. Pemilihan bulan memakai waktu Jepang, termasuk ketika tanggal UTC masih berada pada bulan sebelumnya.
+
+Hanya absensi selesai pada rentang tersebut yang dihitung, termasuk kedua tanggal batas. Judul email, rincian, total, dan tautan ke halaman pendapatan memakai periode yang sama. Tes route menggunakan database SQLite terisolasi dan penyedia email tiruan untuk memeriksa pergantian tahun, Februari biasa/kabisat, batas tengah malam JST, preferensi notifikasi, serta pengecualian draf dan catatan terhapus.
+
 Template cron memakai tema AbsenKuy: teal, gold, cream, latar mint, serta radius 8 px untuk tombol, 12 px untuk kartu ringkasan, dan 16 px untuk panel utama. Wordmark tetap berupa teks agar terbaca tanpa memuat gambar.
 
 Total estimasi pendapatan menjadi informasi utama, diikuti hari dan jam kerja. Rincian harian menampilkan tanggal, masuk/pulang, seluruh interval istirahat, durasi kerja, dan pendapatan. Di ponsel, rincian tersusun vertikal. Tombol membuka halaman pendapatan pada periode email melalui parameter `date`.

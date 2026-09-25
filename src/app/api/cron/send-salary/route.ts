@@ -38,13 +38,13 @@ export async function GET(request: Request) {
       });
     }
 
-    // Determine the payroll period. If today is the 21st,
-    // the period we are reporting on ended on the 20th.
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const dateStr = yesterday.toISOString();
-
-    const { start, end } = getPayrollPeriod(dateStr);
+    // The first-of-month email reports the period closed on the previous
+    // month's 20th: October 1 reports August 21 through September 20.
+    // Use the same JST month as the schedule check, independent of server time zone.
+    const periodEnd = new Date(Date.UTC(
+      nowJST.getUTCFullYear(), nowJST.getUTCMonth() - 1, 20,
+    ));
+    const { start, end } = getPayrollPeriod(periodEnd.toISOString());
 
     const resend = new Resend(process.env.RESEND_API_KEY);
 

@@ -23,6 +23,8 @@ function loadModule(path, dependencies = {}, clock = Date) {
 }
 const helpers = loadModule("../src/lib/user-settings.ts");
 const schema = loadModule("../src/db/schema.ts");
+const attendance = loadModule("../src/lib/attendance.ts");
+const payrollUtils = loadModule("../src/lib/utils.ts", { "./attendance": attendance });
 
 test("profile and password validation rejects malformed inputs and accepts boundary lengths", () => {
   for (const name of [null, {}, "", "   "]) assert.ok(helpers.profileNameError(name));
@@ -116,37 +118,111 @@ test("unauthenticated and invalid preference requests do not write settings", as
   assert.equal((await client.execute("SELECT user_id FROM user_preferences")).rows.length, 0);
 });
 
-class FirstOfMonth extends Date {
-  constructor(...args) { super(...(args.length ? args : ["2026-10-01T02:00:00Z"])); }
-  static now() { return new Date("2026-10-01T02:00:00Z").getTime(); }
+function clockAt(iso) {
+  return class extends Date {
+    constructor(...args) { super(...(args.length ? args : [iso])); }
+    static now() { return new Date(iso).getTime(); }
+  };
 }
 async function cronFixture(t, options = {}) {
   const fixtureData = await fixture(t);
-  await fixtureData.client.executeMultiple(`
+  if (options.seedRecords !== false) await fixtureData.client.executeMultiple(`
     INSERT INTO attendance_records (id, user_id, attendance_date, clock_in, clock_out, has_break, break_count, work_minutes, estimated_salary_yen, status)
-    VALUES ('a', 'one', '2026-09-23', '09:00', '18:00', 0, 0, 540, 11700, 'completed'),
-           ('b', 'two', '2026-09-23', '09:00', '18:00', 0, 0, 540, 10035, 'completed');
+    VALUES ('a', 'one', '2026-09-18', '09:00', '18:00', 0, 0, 540, 11700, 'completed'),
+           ('b', 'two', '2026-09-18', '09:00', '18:00', 0, 0, 540, 10035, 'completed');
   `);
   const sent = [];
+  const messages = [];
+  const rendered = [];
   const route = loadModule("../src/app/api/cron/send-salary/route.ts", {
     "@/db": { db: fixtureData.db }, "@/db/schema": schema,
     "next/server": { NextResponse: { json: (value, init) => Response.json(value, init) } },
-    "@/lib/utils": { getPayrollPeriod: () => ({ start: "2026-09-21", end: "2026-10-20" }) },
+    "@/lib/utils": payrollUtils,
     "@/components/emails/salary-summary-email": { default: (props) => props },
     "@react-email/render": {
-      render: async () => { await options.onRender?.(fixtureData); return "<p>Salary summary</p>"; },
+      render: async (props) => { rendered.push(props); await options.onRender?.(fixtureData); return "<p>Salary summary</p>"; },
       toPlainText: () => "Salary summary",
     },
     resend: { Resend: class {
-      emails = { send: async (message) => { sent.push(message.to); return options.result ?? { data: { id: "test-delivery" }, error: null }; } };
+      emails = { send: async (message) => { sent.push(message.to); messages.push(message); return options.result ?? { data: { id: "test-delivery" }, error: null }; } };
     } },
-  }, FirstOfMonth);
+  }, clockAt(options.now ?? "2026-10-01T02:00:00Z"));
   // Local handler with a mocked email provider; no real messages or network requests.
   const run = () => route.GET(new Request("http://localhost/api/cron/send-salary", {
     headers: process.env.CRON_SECRET ? { authorization: `Bearer ${process.env.CRON_SECRET}` } : {},
   }));
-  return { ...fixtureData, sent, run };
+  return { ...fixtureData, sent, messages, rendered, run };
 }
+
+for (const [now, start, end] of [
+  ["2026-09-30T15:00:00Z", "2026-08-21", "2026-09-20"],
+  ["2026-12-31T15:00:00Z", "2026-11-21", "2026-12-20"],
+  ["2027-01-31T15:00:00Z", "2026-12-21", "2027-01-20"],
+  ["2026-02-28T15:00:00Z", "2026-01-21", "2026-02-20"],
+  ["2028-02-29T15:00:00Z", "2028-01-21", "2028-02-20"],
+]) {
+  test(`salary email at ${now} uses the closed period ${start} through ${end}`, async (t) => {
+    const { client, run, sent, messages, rendered } = await cronFixture(t, { now, seedRecords: false });
+    const beforeStart = start.slice(0, 8) + "20";
+    const afterEnd = end.slice(0, 8) + "21";
+    // Include both edges, but exclude adjacent periods and unfinished/deleted records.
+    for (const [id, date, status, minutes, salary] of [
+      ["end", end, "completed", 120, 2600],
+      ["before", beforeStart, "completed", 999, 99999],
+      ["start", start, "completed", 60, 1300],
+      ["after", afterEnd, "completed", 999, 99999],
+      ["draft", start.slice(0, 8) + "22", "draft", 999, 99999],
+      ["deleted", start.slice(0, 8) + "23", "deleted", 999, 99999],
+    ]) {
+      await client.execute({
+        sql: "INSERT INTO attendance_records (id, user_id, attendance_date, clock_in, clock_out, has_break, break_count, work_minutes, estimated_salary_yen, status) VALUES (?, 'one', ?, '09:00', '11:00', 0, 0, ?, ?, ?)",
+        args: [id, date, minutes, salary, status],
+      });
+    }
+    const response = await run();
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      success: true, message: `Salary email run finished for period ${start} to ${end}`,
+      sentCount: 1, failedCount: 0,
+    });
+    assert.deepEqual(sent, ["one@example.test"]);
+    assert.equal(rendered.length, 1);
+    const props = rendered[0];
+    assert.deepEqual(props.records.map((r) => r.date), [start, end]);
+    assert.equal(props.totalWorkDays, 2);
+    assert.equal(props.totalWorkHours, "3 jam 0 menit");
+    assert.equal(props.totalSalary, "¥3.900");
+    const label = new Intl.DateTimeFormat("id-ID", {
+      day: "numeric", month: "short", year: "numeric", timeZone: "UTC",
+    }).formatRange(new Date(start + "T00:00:00Z"), new Date(end + "T00:00:00Z"));
+    assert.equal(props.period, label);
+    assert.equal(messages[0].subject, `Ringkasan Pendapatan — ${label}`);
+    assert.equal(new URL(props.summaryUrl).pathname, "/salary-summary");
+    assert.equal(new URL(props.summaryUrl).searchParams.get("date"), end);
+  });
+}
+
+for (const now of ["2026-09-30T14:59:59Z", "2026-10-01T15:00:00Z"]) {
+  test(`salary email skips ${now} because it is not the first day in Japan`, async (t) => {
+    const { run, sent, rendered } = await cronFixture(t, { now });
+    const response = await run();
+    assert.equal(response.status, 200);
+    const result = await response.json();
+    assert.equal(result.sentCount, 0);
+    assert.match(result.message, /Skipped/);
+    assert.deepEqual(sent, []);
+    assert.deepEqual(rendered, []);
+  });
+}
+
+test("salary email skips users with records only in the ongoing period", async (t) => {
+  const { client, run, sent } = await cronFixture(t);
+  await client.execute("UPDATE attendance_records SET attendance_date = '2026-09-21'");
+  const response = await run();
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).sentCount, 0);
+  assert.deepEqual(sent, []);
+});
 
 test("cron excludes opted-out users while retaining users without preferences", async (t) => {
   const { actions, run, sent } = await cronFixture(t);
