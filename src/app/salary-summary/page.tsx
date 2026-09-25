@@ -1,21 +1,35 @@
 "use client";
-import { useState, useEffect } from "react";
-import Link from "next/link";
+import { useState, useEffect, useRef, useSyncExternalStore } from "react";
 import {
   Wallet,
   Clock3,
   CalendarDays,
   CalendarCheck,
-  Pencil,
-  Trash2,
+  ChevronLeft,
+  ChevronRight,
   ArrowRight,
   Info,
-  Sun,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useWorkspace, WorkspaceState } from "@/components/workspace";
 import { WorkCalendar } from "@/components/work-calendar";
 import { EditAttendance, DeleteAttendance } from "@/components/edit-attendance";
+import { AttendanceDateDetails } from "@/components/attendance-date-details";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import {
+  changePayrollPeriod,
+  isInPayrollPeriod,
+  payrollCalendarMonths,
+  payrollRangeLabel,
+  payrollViewForDate,
+  type PayrollCalendarView,
+} from "@/lib/payroll-calendar";
 import {
   Dialog,
   DialogContent,
@@ -31,18 +45,40 @@ import {
   monthLabel,
   payrollMonth,
   payrollPeriod,
+  moveMonth,
   duration,
   yen,
   sumRecords,
   type AttendanceRecord,
 } from "@/lib/attendance";
 
+const mobileQuery = "(max-width: 767px)";
+function subscribeMobile(callback: () => void) {
+  const query = window.matchMedia(mobileQuery);
+  query.addEventListener("change", callback);
+  return () => query.removeEventListener("change", callback);
+}
+const getMobileSnapshot = () => window.matchMedia(mobileQuery).matches;
+const getServerSnapshot = () => false;
+
 export default function SalarySummaryPage() {
   const workspace = useWorkspace();
   const [mode, setMode] = useState<"monthly" | "yearly">("monthly");
-  const [month, setMonth] = useState("");
-  const [calendarMonth, setCalendarMonth] = useState("");
-  const [selectedDate, setSelectedDate] = useState("");
+  const [view, setView] = useState<PayrollCalendarView>({
+    month: "",
+    calendarMonth: "",
+    selectedDate: "",
+  });
+  const { month, calendarMonth, selectedDate } = view;
+  const [detailOpen, setDetailOpen] = useState(false);
+  const mobile = useSyncExternalStore(
+    subscribeMobile,
+    getMobileSnapshot,
+    getServerSnapshot,
+  );
+  const calendarTrigger = useRef<HTMLButtonElement | null>(null);
+  const calendarHeading = useRef<HTMLHeadingElement>(null);
+  const detailHeading = useRef<HTMLHeadingElement>(null);
   const [year, setYear] = useState("");
   const [editing, setEditing] = useState<AttendanceRecord | null>(null);
   const [deleting, setDeleting] = useState<AttendanceRecord | null>(null);
@@ -50,10 +86,15 @@ export default function SalarySummaryPage() {
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get("date");
     const date = requested && validDate(requested) ? requested : localDate();
-    setSelectedDate(date);
-    setMonth(payrollMonth(date));
-    setCalendarMonth(date.slice(0, 7));
+    setView(payrollViewForDate(date));
     setYear(payrollMonth(date).slice(0, 4));
+    const query = window.matchMedia(mobileQuery);
+    setDetailOpen(Boolean(requested && validDate(requested) && query.matches));
+    const closeOnDesktop = () => {
+      if (!query.matches) setDetailOpen(false);
+    };
+    query.addEventListener("change", closeOnDesktop);
+    return () => query.removeEventListener("change", closeOnDesktop);
   }, []);
   if (workspace.loading || workspace.error || !workspace.data || !month)
     return <WorkspaceState error={workspace.error} retry={workspace.retry} />;
@@ -83,10 +124,11 @@ export default function SalarySummaryPage() {
   });
   const maxSalary = Math.max(1, ...months.map((m) => m.salary));
   function changePeriod(value: string) {
-    if (!/^\d{4}-\d{2}$/.test(value)) return;
-    setMonth(value);
-    setCalendarMonth(value);
-    setSelectedDate(`${value}-20`);
+    const next = changePayrollPeriod(view, value, localDate());
+    if (next === view) return;
+    setView(next);
+    setYear(next.month.slice(0, 4));
+    setDetailOpen(false);
   }
   function showMonth(value: string) {
     changePeriod(value);
@@ -94,13 +136,65 @@ export default function SalarySummaryPage() {
   }
   async function saved(date: string) {
     await workspace.reload();
-    setMonth(payrollMonth(date));
-    setCalendarMonth(date.slice(0, 7));
-    setSelectedDate(date);
+    setView(payrollViewForDate(date));
+    setYear(payrollMonth(date).slice(0, 4));
+    const url = new URL(window.location.href);
+    url.searchParams.set("date", date);
+    window.history.replaceState(
+      null,
+      "",
+      `${url.pathname}${url.search}${url.hash}`,
+    );
   }
+  function setCalendarMonth(value: string) {
+    setView((current) => ({ ...current, calendarMonth: value }));
+  }
+  const calendarMonths = payrollCalendarMonths(month);
+  const calendarOutside = !calendarMonths.some(
+    (part) => part.month === calendarMonth,
+  );
+  const returnToCalendar = () =>
+    calendarTrigger.current?.isConnected
+      ? calendarTrigger.current
+      : calendarHeading.current;
+  const detailContent = (
+    <AttendanceDateDetails
+      selectedDate={selectedDate}
+      selectedRecord={selectedRecord}
+      holiday={holidays.includes(selectedDate)}
+      month={month}
+      onShowPeriod={() => {
+        setView(payrollViewForDate(selectedDate));
+        setYear(payrollMonth(selectedDate).slice(0, 4));
+      }}
+      onEdit={setEditing}
+      onDelete={setDeleting}
+    />
+  );
+  const recordDialogs = (
+    <>
+      {editing && (
+        <EditAttendance
+          record={editing}
+          onClose={() => setEditing(null)}
+          onSaved={saved}
+          returnFocus={() => detailHeading.current}
+        />
+      )}
+      {deleting && (
+        <DeleteAttendance
+          record={deleting}
+          onClose={() => setDeleting(null)}
+          onSaved={workspace.reload}
+          returnFocus={() => detailHeading.current}
+        />
+      )}
+    </>
+  );
   const years = [
     ...new Set([
       new Date().getFullYear(),
+      Number(year),
       ...records.map((r) => Number(payrollMonth(r.attendanceDate).slice(0, 4))),
     ]),
   ].sort((a, b) => b - a);
@@ -127,11 +221,30 @@ export default function SalarySummaryPage() {
           </button>
         </div>
       </header>
-      <div className="filters">
-        {mode === "monthly" ? (
-          <div className="actions">
-            <label htmlFor="payroll-month" className="field-label">
-              Periode gaji
+      {mode === "monthly" ? (
+        <section
+          className="panel payroll-period"
+          aria-label="Periode gaji terpilih"
+        >
+          <div>
+            <p className="field-label">Periode gaji {monthLabel(month)}</p>
+            <h2 className="payroll-period-range" aria-live="polite">
+              {payrollRangeLabel(month)}
+            </h2>
+            <p className="field-help">
+              Tanggal kerja yang dihitung dalam ringkasan di bawah.
+            </p>
+          </div>
+          <div className="payroll-period-controls">
+            <button
+              className="icon-button"
+              aria-label="Periode gaji sebelumnya"
+              onClick={() => changePeriod(moveMonth(month, -1))}
+            >
+              <ChevronLeft />
+            </button>
+            <label className="sr-only" htmlFor="payroll-month">
+              Ubah periode gaji
             </label>
             <input
               type="month"
@@ -140,41 +253,42 @@ export default function SalarySummaryPage() {
               value={month}
               onChange={(event) => changePeriod(event.target.value)}
             />
-          </div>
-        ) : (
-          <div className="actions">
-            <label htmlFor="salary-year" className="field-label">
-              Tahun
-            </label>
-            <select
-              id="salary-year"
-              className="form-input"
-              value={year}
-              onChange={(e) => setYear(e.target.value)}
+            <button
+              className="icon-button"
+              aria-label="Periode gaji berikutnya"
+              onClick={() => changePeriod(moveMonth(month, 1))}
             >
-              {years.map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
+              <ChevronRight />
+            </button>
           </div>
-        )}
-        {mode === "monthly" && (
-          <button
-            className="btn btn-outline"
-            onClick={() => setHolidayOpen(true)}
-          >
-            <CalendarDays />
-            Atur hari libur
-          </button>
-        )}
-      </div>
-      <p className="field-help mb-4">
-        {mode === "monthly"
-          ? `Periode gaji ${monthLabel(month)} · ${dateLabel(period.start)} – ${dateLabel(period.end)}`
-          : `12 periode gaji tahun ${year} · setiap periode dimulai tanggal 21 dan berakhir tanggal 20.`}
-      </p>
+        </section>
+      ) : (
+        <>
+          <div className="filters">
+            <div className="actions">
+              <label htmlFor="salary-year" className="field-label">
+                Tahun
+              </label>
+              <select
+                id="salary-year"
+                className="form-input"
+                value={year}
+                onChange={(e) => setYear(e.target.value)}
+              >
+                {years.map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <p className="field-help mb-4">
+            12 periode gaji tahun {year} · setiap periode dimulai tanggal 21 dan
+            berakhir tanggal 20.
+          </p>
+        </>
+      )}
       <div className="metrics">
         <section className="panel metric metric-highlight">
           <h2 className="metric-label">
@@ -190,9 +304,11 @@ export default function SalarySummaryPage() {
             Total jam kerja
           </h2>
           <p className="metric-value metric-duration">
-            {duration(totals.minutes).split(/ (?=\d)/).map((part) => (
-              <span key={part}>{part}{" "}</span>
-            ))}
+            {duration(totals.minutes)
+              .split(/ (?=\d)/)
+              .map((part) => (
+                <span key={part}>{part} </span>
+              ))}
           </p>
           <small>Setelah dikurangi istirahat</small>
         </section>
@@ -210,11 +326,72 @@ export default function SalarySummaryPage() {
       {mode === "monthly" ? (
         <div className="calendar-layout">
           <section className="panel">
+            <div className="payroll-calendar-heading">
+              <h2 ref={calendarHeading} tabIndex={-1}>
+                Kalender kerja
+              </h2>
+              <button
+                className="text-button"
+                onClick={() => setHolidayOpen(true)}
+              >
+                <CalendarDays /> Atur hari libur
+              </button>
+            </div>
+            <p className="field-help">
+              Periode terpilih: <strong>{payrollRangeLabel(month)}</strong>
+            </p>
+            <div
+              className="payroll-calendar-months"
+              role="group"
+              aria-label="Bulan dalam periode gaji"
+            >
+              {calendarMonths.map((part) => (
+                <button
+                  key={part.month}
+                  aria-pressed={calendarMonth === part.month}
+                  aria-label={`Tampilkan ${monthLabel(part.month)}, tanggal ${Number(part.start.slice(8))} sampai ${Number(part.end.slice(8))}`}
+                  onClick={() => setCalendarMonth(part.month)}
+                >
+                  <strong>{monthLabel(part.month)}</strong>
+                  <span>
+                    Tanggal {Number(part.start.slice(8))}–
+                    {Number(part.end.slice(8))}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {calendarOutside && (
+              <div className="notice mb-4">
+                <Info />
+                <p>
+                  Bulan kalender ini di luar periode terpilih. Ringkasan tetap
+                  untuk {payrollRangeLabel(month)}.{" "}
+                  <button
+                    className="inline-link"
+                    onClick={() =>
+                      setCalendarMonth(
+                        isInPayrollPeriod(selectedDate, month)
+                          ? selectedDate.slice(0, 7)
+                          : calendarMonths[0].month,
+                      )
+                    }
+                  >
+                    Kembali ke periode
+                  </button>
+                </p>
+              </div>
+            )}
             <WorkCalendar
               month={calendarMonth}
               onMonthChange={setCalendarMonth}
               selected={selectedDate}
-              onSelect={setSelectedDate}
+              onSelect={(date, trigger) => {
+                calendarTrigger.current = trigger;
+                setView((current) => ({ ...current, selectedDate: date }));
+                if (mobile) setDetailOpen(true);
+              }}
+              detailsDialog={mobile}
+              detailsOpen={detailOpen}
               holidays={holidays}
               recorded={activeRecords
                 .filter((r) => r.status === "completed")
@@ -225,139 +402,50 @@ export default function SalarySummaryPage() {
               period={period}
             />
             <p className="field-help mt-4">
-              Kalender bisa digeser tanpa mengubah periode gaji di atas.
+              {mobile
+                ? "Ketuk tanggal untuk melihat detail. "
+                : "Pilih tanggal untuk melihat detail. "}
+              Menggeser bulan kalender tidak mengubah periode gaji.
             </p>
           </section>
-          <section
-            className="panel panel-gold"
-            aria-label="Detail tanggal terpilih"
-          >
-            <div className="panel-title">
-              <span className="icon-tile gold">
-                <CalendarDays />
-              </span>
-              <div>
-                <p className="field-help">Tanggal dipilih</p>
-                <h2>{dateLabel(selectedDate)}</h2>
-              </div>
-            </div>
-            {(selectedDate < period.start || selectedDate > period.end) && (
-              <div className="notice mb-5">
-                <Info />
-                <p>
-                  Tanggal ini berada di luar periode gaji yang dipilih.{" "}
-                  <button
-                    className="inline-link"
-                    onClick={() => setMonth(payrollMonth(selectedDate))}
-                  >
-                    Lihat periodenya
-                  </button>
-                </p>
-              </div>
-            )}
-            {holidays.includes(selectedDate) && (
-              <p className="status deleted mb-4">
-                <Sun size={12} />
-                Hari libur
-              </p>
-            )}
-            {selectedRecord ? (
-              <>
-                {selectedRecord.status === "draft" && (
-                  <p className="status draft mb-4">
-                    <Clock3 />
-                    Draf — belum selesai
-                  </p>
-                )}
-                <dl className="detail-list">
-                  <div>
-                    <dt>Jam kerja</dt>
-                    <dd>
-                      {selectedRecord.clockIn || "—"} –{" "}
-                      {selectedRecord.clockOut || "—"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Istirahat</dt>
-                    <dd>
-                      {selectedRecord.hasBreak ? (
-                        <>
-                          {selectedRecord.break1From} –{" "}
-                          {selectedRecord.break1To}
-                          {selectedRecord.breakCount === 2 && (
-                            <>
-                              <br />
-                              {selectedRecord.break2From} –{" "}
-                              {selectedRecord.break2To}
-                            </>
-                          )}
-                        </>
-                      ) : (
-                        "Tanpa istirahat"
-                      )}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Tarif saat dicatat</dt>
-                    <dd>{yen(selectedRecord.hourlyWageYen)}/jam</dd>
-                  </div>
-                  <div>
-                    <dt>Jam kerja bersih</dt>
-                    <dd>
-                      {selectedRecord.status === "draft"
-                        ? "Belum selesai"
-                        : duration(selectedRecord.workMinutes)}
-                    </dd>
-                  </div>
-                </dl>
-                <div className="earnings-total mt-6">
-                  <p>Estimasi pendapatan tanggal ini</p>
-                  <strong>
-                    {selectedRecord.status === "draft"
-                      ? "—"
-                      : yen(selectedRecord.estimatedSalaryYen)}
-                  </strong>
-                  {selectedRecord.status === "draft" && (
-                    <p className="mt-2">
-                      Draf belum masuk perhitungan pendapatan.
-                    </p>
-                  )}
+          {mobile ? (
+            <Sheet open={detailOpen} onOpenChange={setDetailOpen}>
+              <SheetContent
+                side="bottom"
+                className="attendance-detail-sheet"
+                initialFocus={detailHeading}
+                finalFocus={returnToCalendar}
+              >
+                <SheetHeader>
+                  <SheetDescription>Detail tanggal terpilih</SheetDescription>
+                  <SheetTitle ref={detailHeading} tabIndex={-1}>
+                    {dateLabel(selectedDate, true)}
+                  </SheetTitle>
+                </SheetHeader>
+                {detailContent}
+                {recordDialogs}
+              </SheetContent>
+            </Sheet>
+          ) : (
+            <section
+              className="panel panel-gold"
+              aria-label="Detail tanggal terpilih"
+            >
+              <div className="panel-title">
+                <span className="icon-tile gold">
+                  <CalendarDays />
+                </span>
+                <div>
+                  <p className="field-help">Tanggal dipilih</p>
+                  <h2 ref={detailHeading} tabIndex={-1}>
+                    {dateLabel(selectedDate)}
+                  </h2>
                 </div>
-                <div className="detail-actions">
-                  <button
-                    className="btn btn-secondary"
-                    onClick={() => setEditing(selectedRecord)}
-                  >
-                    <Pencil />
-                    Ubah absensi
-                  </button>
-                  <button
-                    className="text-button text-coral"
-                    onClick={() => setDeleting(selectedRecord)}
-                  >
-                    <Trash2 />
-                    Hapus catatan
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div className="empty-state !px-0 !py-6">
-                <Clock3 />
-                <h3>Belum ada catatan</h3>
-                <p>
-                  Catat jam kerja untuk tanggal ini agar pendapatanmu ikut
-                  terhitung.
-                </p>
-                <Link
-                  href={`/?date=${selectedDate}`}
-                  className="btn btn-primary"
-                >
-                  Catat absensi
-                  <ArrowRight />
-                </Link>
               </div>
-            )}
-          </section>
+              {detailContent}
+              {recordDialogs}
+            </section>
+          )}
         </div>
       ) : (
         <section className="panel">
@@ -397,7 +485,7 @@ export default function SalarySummaryPage() {
                   className="text-button"
                   onClick={() => showMonth(m.key)}
                 >
-                  Lihat bulan
+                  Lihat periode
                   <ArrowRight />
                 </button>
               </article>
@@ -412,20 +500,6 @@ export default function SalarySummaryPage() {
           dan catatan yang dihapus tidak dihitung.
         </p>
       </div>
-      {editing && (
-        <EditAttendance
-          record={editing}
-          onClose={() => setEditing(null)}
-          onSaved={saved}
-        />
-      )}
-      {deleting && (
-        <DeleteAttendance
-          record={deleting}
-          onClose={() => setDeleting(null)}
-          onSaved={workspace.reload}
-        />
-      )}
       {holidayOpen && (
         <HolidayEditor
           initial={holidays}

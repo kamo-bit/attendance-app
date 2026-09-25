@@ -128,10 +128,12 @@ export function DeleteAttendance({
   record,
   onClose,
   onSaved,
+  returnFocus,
 }: {
   record: AttendanceRecord;
   onClose: () => void;
   onSaved: () => Promise<void>;
+  returnFocus?: () => HTMLElement | null;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -151,7 +153,7 @@ export function DeleteAttendance({
   }
   return (
     <Dialog open onOpenChange={(open) => !open && !busy && onClose()}>
-      <DialogContent className="dialog-panel">
+      <DialogContent className="dialog-panel" finalFocus={returnFocus}>
         <DialogHeader>
           <DialogTitle>Hapus catatan absensi ini?</DialogTitle>
           <DialogDescription>

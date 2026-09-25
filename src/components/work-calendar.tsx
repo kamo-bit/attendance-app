@@ -18,16 +18,20 @@ export function WorkCalendar({
   drafts = [],
   period,
   holidayMode = false,
+  detailsDialog = false,
+  detailsOpen = false,
 }: {
   month: string;
   onMonthChange: (month: string) => void;
   selected?: string;
-  onSelect: (date: string) => void;
+  onSelect: (date: string, trigger: HTMLButtonElement) => void;
   holidays: string[];
   recorded?: string[];
   drafts?: string[];
   period?: { start: string; end: string };
   holidayMode?: boolean;
+  detailsDialog?: boolean;
+  detailsOpen?: boolean;
 }) {
   return (
     <>
@@ -78,7 +82,9 @@ export function WorkCalendar({
               title={draft ? "Absensi masih draf — belum selesai" : undefined}
               aria-current={today ? "date" : undefined}
               aria-pressed={chosen}
-              onClick={() => onSelect(date)}
+              aria-haspopup={detailsDialog ? "dialog" : undefined}
+              aria-expanded={detailsDialog ? chosen && detailsOpen : undefined}
+              onClick={(event) => onSelect(date, event.currentTarget)}
             >
               <span>{Number(date.slice(8))}</span>
               <span className="day-markers" aria-hidden="true">
