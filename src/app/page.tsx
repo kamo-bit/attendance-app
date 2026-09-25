@@ -6,7 +6,6 @@ import {
   ReceiptText,
   CheckCircle2,
   Save,
-  Info,
   CalendarDays,
   ArrowRight,
   History as HistoryIcon,
@@ -14,6 +13,7 @@ import {
 import { toast } from "sonner";
 import { useWorkspace, WorkspaceState } from "@/components/workspace";
 import { AttendanceFields } from "@/components/attendance-fields";
+import { AttendanceSaveBar } from "@/components/attendance-save-bar";
 import {
   Dialog,
   DialogContent,
@@ -21,7 +21,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { saveAttendance, updateSalarySettings } from "@/app/actions";
+import { saveAttendance } from "@/app/actions";
 import {
   type AttendanceRecord,
   type AttendanceInput,
@@ -49,13 +49,13 @@ export default function Home() {
   );
   const defaults = attendanceFormDefaults(date, workspace.data.records);
   return (
-    <div className="page">
+    <div className="page attendance-page">
       <div className="eyebrow">AbsenKuy / Catatan harian</div>
       <header className="page-heading">
         <div>
           <h1>{date === localDate() ? "Absensi hari ini" : "Catat absensi"}</h1>
           <p>
-            Catat jam kerja dan istirahat untuk menghitung estimasi pendapatan.
+            Catat jam kerja dan lihat estimasi pendapatan.
           </p>
         </div>
         <span className="ribbon">
@@ -95,11 +95,8 @@ function AttendanceEditor({
   reload: () => Promise<void>;
 }) {
   const [value, setValue] = useState<AttendanceInput>(defaults.value);
-  const [wageInput, setWageInput] = useState(String(wage));
   const [saving, setSaving] = useState(false);
-  const [savingWage, setSavingWage] = useState(false);
   const [error, setError] = useState("");
-  const [wageError, setWageError] = useState("");
   const [holidayStatus, setHolidayStatus] = useState<
     "draft" | "completed" | null
   >(null);
@@ -112,24 +109,8 @@ function AttendanceEditor({
       onDateChange(next.attendanceDate);
     else setValue(next);
   }
-  async function saveRate() {
-    setWageError("");
-    setSavingWage(true);
-    try {
-      const result = await updateSalarySettings(Number(wageInput));
-      if (result.error) {
-        setWageError(result.error);
-        return;
-      }
-      await reload();
-      toast.success("Tarif baru berhasil disimpan.");
-    } catch {
-      setWageError("Tarif belum tersimpan. Silakan coba lagi.");
-    } finally {
-      setSavingWage(false);
-    }
-  }
   async function save(status: "draft" | "completed", confirmed = false) {
+    if (saving) return;
     const next = { ...value, status };
     const validation = validateAttendance(next);
     if (validation) {
@@ -164,7 +145,7 @@ function AttendanceEditor({
   return (
     <>
       <div className="attendance-grid">
-        <section className="panel">
+        <section className="panel attendance-form-panel">
           <div className="panel-title">
             <span className="icon-tile">
               <Clock3 />
@@ -172,11 +153,10 @@ function AttendanceEditor({
             <h2>Jam kerja</h2>
           </div>
           {defaults.sourceDate && (
-            <div className="notice mb-5">
+            <div className="notice attendance-source">
               <HistoryIcon />
               <p>
-                Nilai awal dari {dateLabel(defaults.sourceDate)}. Sesuaikan jika
-                jam kerja atau istirahat tanggal ini berbeda.
+                Jam awal dari {dateLabel(defaults.sourceDate)}. Sesuaikan jika berbeda.
               </p>
             </div>
           )}
@@ -204,12 +184,9 @@ function AttendanceEditor({
           {record?.status === "draft" && (
             <div className="notice mt-5">
               <Save />
-              <span>Draf tersimpan. Lengkapi catatan lalu simpan absensi.</span>
+              <span>Draf tersimpan. Lengkapi saat selesai bekerja.</span>
             </div>
           )}
-          <p className="field-help mt-5">
-            Jam masuk dan pulang dicatat pada tanggal yang sama.
-          </p>
         </section>
         <section
           className="panel panel-gold stack"
@@ -235,50 +212,15 @@ function AttendanceEditor({
               <strong>{duration(net)}</strong>
             </div>
           </div>
-          <div className="field">
-            <label htmlFor="hourly-wage">Upah per jam</label>
-            <div className="wage-control">
-              <div className="money-input">
-                <span aria-hidden="true">¥</span>
-                <input
-                  className="form-input"
-                  id="hourly-wage"
-                  type="number"
-                  inputMode="numeric"
-                  min="1"
-                  max="1000000"
-                  step="1"
-                  value={wageInput}
-                  onChange={(e) => setWageInput(e.target.value)}
-                  aria-describedby="wage-help"
-                  aria-invalid={Boolean(wageError)}
-                />
-              </div>
-              <button
-                className="btn btn-secondary"
-                type="button"
-                onClick={saveRate}
-                disabled={savingWage || Number(wageInput) === wage}
-              >
-                {savingWage ? "Menyimpan…" : "Simpan tarif"}
-              </button>
+          <div className="attendance-rate">
+            <div className="summary-line">
+              <span>{record ? "Tarif catatan ini" : "Tarif per jam"}</span>
+              <strong>{yen(rate)}/jam</strong>
             </div>
-            <p id="wage-help" className="field-help">
-              Catatan tersimpan tetap memakai tarif saat dicatat.
-            </p>
-            {record && (
-              <p className="field-help">
-                Tarif catatan ini: <strong>{yen(rate)}/jam</strong>
-              </p>
-            )}
-            {Number(wageInput) !== wage && (
-              <p className="field-help">Perubahan tarif belum disimpan.</p>
-            )}
-            {wageError && (
-              <p className="error-text" role="alert">
-                {wageError}
-              </p>
-            )}
+            <Link className="text-button" href="/settings#settings-work">
+              Ubah tarif default di Pengaturan <ArrowRight aria-hidden="true" />
+            </Link>
+            {record && <p className="field-help">Tarif catatan tersimpan tetap sama.</p>}
           </div>
           <div className="earnings-total" aria-live="polite">
             <p>ESTIMASI PENDAPATAN</p>
@@ -287,12 +229,6 @@ function AttendanceEditor({
               {duration(net)} × {yen(rate)}/jam
             </p>
           </div>
-          {error && (
-            <div role="alert" className="notice error">
-              <Info />
-              <span>{error}</span>
-            </div>
-          )}
           {complete ? (
             <Link
               className="btn btn-secondary"
@@ -302,29 +238,7 @@ function AttendanceEditor({
               <ArrowRight />
             </Link>
           ) : (
-            <div className="grid gap-3">
-              <button
-                type="button"
-                className="btn btn-primary btn-full"
-                onClick={() => save("completed")}
-                disabled={saving || savingWage}
-              >
-                <CheckCircle2 />
-                {saving ? "Menyimpan…" : "Simpan absensi"}
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary btn-full"
-                onClick={() => save("draft")}
-                disabled={saving || savingWage}
-              >
-                <Save />
-                Simpan draf
-              </button>
-              <p className="field-help text-center">
-                Draf belum dihitung dalam total pendapatan.
-              </p>
-            </div>
+            <AttendanceSaveBar saving={saving} error={error} onSave={save} />
           )}
         </section>
       </div>

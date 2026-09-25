@@ -19,6 +19,14 @@
 - Pemilih bekerja pada jam masuk, pulang, semua waktu istirahat, dan di dalam dialog edit. Dialog induk meredup ketika pemilih terbuka.
 - Token warna dan radius Flip7 dipakai pada kedua tema. Layar lanskap pendek menampilkan pengaturan dan jam dinding berdampingan.
 
+## Formulir mobile yang ringkas
+
+- Pada lebar di bawah 768 px, Simpan absensi dan Simpan draf berada pada satu bilah tetap di atas navigasi bawah. Pada tablet/desktop, tombol tetap menjadi bagian dari Ringkasan harian. Hanya ada satu set tombol di DOM.
+- Tinggi bilah dan navigasi diukur dengan ResizeObserver. Ruang di bagian bawah halaman mengikuti tinggi aktual, termasuk pesan kesalahan yang membungkus dan safe area navigasi. Ringkasan terakhir tetap dapat digulir hingga terlihat seluruhnya. Dialog jam dan konfirmasi hari libur tampil di atas bilah.
+- Pesan validasi tampil di dalam bilah dekat tombol. Tombol dinonaktifkan selama penyimpanan, dan bilah hilang ketika catatan selesai.
+- Petunjuk dan jarak antarbagian diringkas. Tarif ditampilkan sebagai informasi; tautan Ubah tarif default di Pengaturan membuka langsung bagian Pengaturan kerja setelah data akun selesai dimuat. Catatan/draf yang sudah tersimpan tetap memakai tarif aslinya.
+- QA dengan database lokal: validasi jam pulang kosong, simpan draf dan muat ulang, selesaikan absensi dan muat ulang, pembatalan konfirmasi hari libur, popup jam, tautan pengaturan tarif, serta tema terang/gelap. Layout diperiksa pada 320×740, 360×780, 390×844, 430×932, 667×375, 768×1024, 1024×768, dan 1280×800 tanpa overflow horizontal. Pengujian memakai viewport browser, bukan perangkat fisik.
+
 ## Validasi lokal
 
 - 19 tes domain dan pemilih jam lulus, termasuk pemilihan tanggal sumber, draf/riwayat dihapus, dua istirahat, batas tahun, 24 jam, 60 posisi menit, area tengah jarum, dan validasi input manual.

@@ -1,4 +1,5 @@
 .settings-page { max-width: 1240px; }
+#settings-work { scroll-margin-top: 100px; }
 .settings-heading-icon {
   display: grid;
   place-items: center;

@@ -505,6 +505,24 @@
   gap: 24px;
   align-items: start;
 }
+.attendance-source {
+  margin-bottom: 20px;
+}
+.attendance-rate {
+  display: grid;
+  gap: 2px;
+}
+.attendance-rate .text-button {
+  justify-self: start;
+  text-align: left;
+  font-size: 12px;
+}
+.attendance-savebar,
+.attendance-save-buttons {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
 .stack {
   display: grid;
   gap: 24px;
@@ -822,15 +840,6 @@
   font-size: 16px;
   font-weight: 800;
   color: var(--teal-text);
-}
-.wage-control {
-  display: flex;
-  gap: 8px;
-}
-.wage-control .btn {
-  font-size: 12px;
-  padding-inline: 14px;
-  white-space: nowrap;
 }
 .money-input {
   position: relative;
@@ -1906,6 +1915,59 @@
     grid-template-columns: 1fr;
     gap: 20px;
   }
+  .attendance-page:has(.attendance-savebar) {
+    padding-bottom: calc(var(--attendance-actions-height, 116px) + var(--attendance-nav-height, 73px) + 24px);
+  }
+  .attendance-page .panel {
+    padding: 16px;
+  }
+  .attendance-page .stack {
+    gap: 16px;
+  }
+  .attendance-form-panel .panel-title,
+  .attendance-source {
+    margin-bottom: 16px;
+  }
+  .attendance-page .section-divider {
+    padding-top: 16px;
+  }
+  .attendance-page .attendance-fields :is(input, button) {
+    scroll-margin-top: 90px;
+    scroll-margin-bottom: calc(var(--attendance-actions-height, 116px) + var(--attendance-nav-height, 73px) + 16px);
+  }
+  .attendance-savebar {
+    position: fixed;
+    z-index: 40;
+    left: 0;
+    right: 0;
+    bottom: var(--attendance-nav-height, calc(73px + env(safe-area-inset-bottom)));
+    padding: 12px max(12px, env(safe-area-inset-right)) 10px max(12px, env(safe-area-inset-left));
+    gap: 8px;
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -4px 20px #041d1914;
+  }
+  .attendance-save-buttons {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    gap: 8px;
+  }
+  .attendance-save-buttons .btn {
+    min-height: 48px;
+    min-width: 0;
+    padding: 10px;
+    font-size: 13px;
+    gap: 6px;
+  }
+  .attendance-save-buttons svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+  .attendance-savebar .notice.error {
+    padding: 10px 12px;
+    max-height: min(25dvh, 160px);
+    overflow-y: auto;
+  }
   .panel {
     padding: 20px;
   }
@@ -2083,12 +2145,6 @@
   }
   .calendar-toolbar {
     flex-wrap: wrap;
-  }
-  .wage-control {
-    flex-wrap: wrap;
-  }
-  .wage-control .money-input {
-    flex-basis: 130px;
   }
   .form-input {
     padding-inline: 10px;

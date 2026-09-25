@@ -366,6 +366,14 @@ function ProfilePhoto({ initialImage, name, refreshSession }: {
 }
 
 function WageSection({ initialWage }: { initialWage: number }) {
+  const sectionRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    // Settings load asynchronously, after Next.js initially handles the hash.
+    if (window.location.hash === "#settings-work") {
+      sectionRef.current?.focus({ preventScroll: true });
+      sectionRef.current?.scrollIntoView({ block: "start" });
+    }
+  }, []);
   const [value, setValue] = useState(String(initialWage));
   const [savedWage, setSavedWage] = useState(initialWage);
   const [busy, setBusy] = useState(false);
@@ -393,7 +401,7 @@ function WageSection({ initialWage }: { initialWage: number }) {
     } finally { if (active.current) setBusy(false); }
   }
   return (
-    <section className="panel panel-gold settings-card" aria-labelledby="settings-work-title">
+    <section id="settings-work" ref={sectionRef} tabIndex={-1} className="panel panel-gold settings-card" aria-labelledby="settings-work-title">
       <SectionHeading id="settings-work-title" icon={<Wallet />} title="Pengaturan kerja" description="Nilai awal untuk menghitung pendapatanmu." gold />
       <form className="settings-form" noValidate onSubmit={save}>
         <div className="field">

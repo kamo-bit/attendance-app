@@ -37,7 +37,7 @@ export function AttendanceFields({
   return (
     <fieldset
       disabled={disabled}
-      className="stack"
+      className="stack attendance-fields"
       style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}
     >
       <legend className="sr-only">Tanggal dan jam kerja</legend>
@@ -50,11 +50,7 @@ export function AttendanceFields({
           value={value.attendanceDate}
           onChange={(event) => change({ attendanceDate: event.target.value })}
           required
-          aria-describedby={`${prefix}-date-help`}
         />
-        <p className="field-help" id={`${prefix}-date-help`}>
-          Bisa mencatat tanggal sebelumnya.
-        </p>
       </div>
       <div className="two-col">
         <div className="field">
@@ -89,8 +85,7 @@ export function AttendanceFields({
         </div>
       </div>
       <p className="field-help">
-        Format 24 jam. Ketuk ikon jam untuk memilih waktu, atau ketik 0900 di
-        komputer. Jam pulang boleh dikosongkan untuk draf.
+        Format 24 jam, pada tanggal yang sama. Jam pulang boleh kosong untuk draf.
       </p>
       <section className="section-divider">
         <div className="break-heading">
@@ -100,7 +95,7 @@ export function AttendanceFields({
               Istirahat
             </h3>
             <p className="field-help">
-              Waktu istirahat tidak dihitung sebagai jam kerja.
+              Dikurangi dari jam kerja.
             </p>
           </div>
           <button
