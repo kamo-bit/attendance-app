@@ -24,6 +24,7 @@ function loadModule(path, dependencies = {}, clock = Date) {
 const helpers = loadModule("../src/lib/user-settings.ts");
 const schema = loadModule("../src/db/schema.ts");
 const attendance = loadModule("../src/lib/attendance.ts");
+const salaryEstimates = loadModule("../src/lib/salary-estimate.ts", { "./attendance": attendance });
 const payrollUtils = loadModule("../src/lib/utils.ts", { "./attendance": attendance });
 
 test("profile and password validation rejects malformed inputs and accepts boundary lengths", () => {
@@ -134,24 +135,26 @@ async function cronFixture(t, options = {}) {
   const sent = [];
   const messages = [];
   const rendered = [];
+  const deliveryOptions = [];
   const route = loadModule("../src/app/api/cron/send-salary/route.ts", {
     "@/db": { db: fixtureData.db }, "@/db/schema": schema,
     "next/server": { NextResponse: { json: (value, init) => Response.json(value, init) } },
     "@/lib/utils": payrollUtils,
+    "@/lib/salary-estimate": salaryEstimates,
     "@/components/emails/salary-summary-email": { default: (props) => props },
     "@react-email/render": {
       render: async (props) => { rendered.push(props); await options.onRender?.(fixtureData); return "<p>Salary summary</p>"; },
       toPlainText: () => "Salary summary",
     },
     resend: { Resend: class {
-      emails = { send: async (message) => { sent.push(message.to); messages.push(message); return options.result ?? { data: { id: "test-delivery" }, error: null }; } };
+      emails = { send: async (message, settings) => { sent.push(message.to); messages.push(message); deliveryOptions.push(settings); return options.result ?? { data: { id: "test-delivery" }, error: null }; } };
     } },
   }, clockAt(options.now ?? "2026-10-01T02:00:00Z"));
   // Local handler with a mocked email provider; no real messages or network requests.
   const run = () => route.GET(new Request("http://localhost/api/cron/send-salary", {
     headers: process.env.CRON_SECRET ? { authorization: `Bearer ${process.env.CRON_SECRET}` } : {},
   }));
-  return { ...fixtureData, sent, messages, rendered, run };
+  return { ...fixtureData, sent, messages, rendered, deliveryOptions, run };
 }
 
 for (const [now, start, end] of [
@@ -162,7 +165,7 @@ for (const [now, start, end] of [
   ["2028-02-29T15:00:00Z", "2028-01-21", "2028-02-20"],
 ]) {
   test(`salary email at ${now} uses the closed period ${start} through ${end}`, async (t) => {
-    const { client, run, sent, messages, rendered } = await cronFixture(t, { now, seedRecords: false });
+    const { client, run, sent, messages, rendered, deliveryOptions } = await cronFixture(t, { now, seedRecords: false });
     const beforeStart = start.slice(0, 8) + "20";
     const afterEnd = end.slice(0, 8) + "21";
     // Include both edges, but exclude adjacent periods and unfinished/deleted records.
@@ -192,13 +195,19 @@ for (const [now, start, end] of [
     assert.equal(props.totalWorkDays, 2);
     assert.equal(props.totalWorkHours, "3 jam 0 menit");
     assert.equal(props.totalSalary, "¥3.900");
+    assert.equal(props.estimate.totalDeductions, 55400);
+    assert.equal(props.estimate.net, 3900 - 55400);
+    assert.equal(props.estimate.draftCount, 1);
+    assert.equal(props.estimate.status, "ready");
+    assert.equal(deliveryOptions[0].idempotencyKey, `salary-summary/one/${end.slice(0, 7)}`);
     const label = new Intl.DateTimeFormat("id-ID", {
       day: "numeric", month: "short", year: "numeric", timeZone: "UTC",
     }).formatRange(new Date(start + "T00:00:00Z"), new Date(end + "T00:00:00Z"));
     assert.equal(props.period, label);
     assert.equal(messages[0].subject, `Ringkasan Pendapatan — ${label}`);
     assert.equal(new URL(props.summaryUrl).pathname, "/salary-summary");
-    assert.equal(new URL(props.summaryUrl).searchParams.get("date"), end);
+    assert.equal(new URL(props.summaryUrl).searchParams.get("period"), end.slice(0, 7));
+    assert.equal(new URL(props.summaryUrl).searchParams.has("date"), false);
   });
 }
 

@@ -6,6 +6,7 @@ import { getPayrollPeriod } from '@/lib/utils';
 import { Resend } from 'resend';
 import { render, toPlainText } from '@react-email/render';
 import SalarySummaryEmail from '@/components/emails/salary-summary-email';
+import { jstDate, salaryEstimate } from '@/lib/salary-estimate';
 
 const DAY_NAMES = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 
@@ -27,7 +28,8 @@ export async function GET(request: Request) {
 
   try {
     // Check if today is the 1st of the month in JST (UTC+9)
-    const nowJST = new Date(Date.now() + 9 * 60 * 60 * 1000); // shift UTC to JST
+    const now = new Date(Date.now());
+    const nowJST = new Date(now.getTime() + 9 * 60 * 60 * 1000); // shift UTC to JST
     const dayOfMonthJST = nowJST.getUTCDate();
 
     if (dayOfMonthJST !== 1) {
@@ -66,15 +68,13 @@ export async function GET(request: Request) {
             eq(attendanceRecords.userId, user.id),
             gte(attendanceRecords.attendanceDate, start),
             lte(attendanceRecords.attendanceDate, end),
-            eq(attendanceRecords.status, 'completed')
+            or(eq(attendanceRecords.status, 'completed'), eq(attendanceRecords.status, 'draft'))
           )
         );
 
-      if (records.length === 0) continue; // Skip users with no records this period
-
-      let totalWorkMinutes = 0;
-      let totalSalaryYen = 0;
-      let totalWorkDays = 0;
+      const estimate = salaryEstimate(end.slice(0, 7), records, jstDate(now));
+      if (estimate.status !== 'ready') continue;
+      const { minutes: totalWorkMinutes, salary: totalSalaryYen, days: totalWorkDays } = estimate;
 
       // Sort records by date ascending
       const sortedRecords = [...records].sort((a, b) =>
@@ -83,10 +83,10 @@ export async function GET(request: Request) {
 
       // Build per-day rows for the table
       const dailyRows = sortedRecords
-        .filter(r => r.clockIn) // only days with clock-in
+        .filter(r => r.status === 'completed')
         .map(r => {
           const date = new Date(r.attendanceDate);
-          const dayName = DAY_NAMES[date.getDay()];
+          const dayName = DAY_NAMES[date.getUTCDay()];
 
           // Build break time string
           let breakTime = '—';
@@ -96,10 +96,6 @@ export async function GET(request: Request) {
               breakTime += `, ${r.break2From}–${r.break2To}`;
             }
           }
-
-          totalWorkDays++;
-          totalWorkMinutes += r.workMinutes || 0;
-          totalSalaryYen += r.estimatedSalaryYen || 0;
 
           return {
             date: r.attendanceDate,
@@ -118,7 +114,7 @@ export async function GET(request: Request) {
         day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
       }).formatRange(new Date(start + 'T00:00:00Z'), new Date(end + 'T00:00:00Z'));
       const summaryUrl = new URL('/salary-summary', process.env.NEXT_PUBLIC_APP_URL || 'https://www.absenkuy.cc');
-      summaryUrl.searchParams.set('date', end);
+      summaryUrl.searchParams.set('period', end.slice(0, 7));
 
       const emailHtml = await render(
         SalarySummaryEmail({
@@ -129,6 +125,7 @@ export async function GET(request: Request) {
           totalSalary: `¥${totalSalaryYen.toLocaleString('id-ID')}`,
           records: dailyRows,
           summaryUrl: summaryUrl.toString(),
+          estimate,
         })
       );
 
@@ -144,7 +141,7 @@ export async function GET(request: Request) {
           subject: `Ringkasan Pendapatan — ${periodLabel}`,
           html: emailHtml,
           text: toPlainText(emailHtml),
-        });
+        }, { idempotencyKey: `salary-summary/${user.id}/${end.slice(0, 7)}` });
         // Resend can return a delivery error without throwing.
         if (result.error || !result.data?.id) {
           failedCount++;

@@ -13,6 +13,9 @@ import {
 import { toast } from "sonner";
 import { useWorkspace, WorkspaceState } from "@/components/workspace";
 import { WorkCalendar } from "@/components/work-calendar";
+import { SalaryDeductions } from "@/components/salary-deductions";
+import { useJstDate } from "@/components/use-jst-date";
+import { estimateYen, jstDate, latestClosedPayrollMonth, salaryEstimate } from "@/lib/salary-estimate";
 import { EditAttendance, DeleteAttendance } from "@/components/edit-attendance";
 import { AttendanceDateDetails } from "@/components/attendance-date-details";
 import {
@@ -39,7 +42,6 @@ import {
 } from "@/components/ui/dialog";
 import { saveUserHolidays } from "@/app/actions";
 import {
-  localDate,
   validDate,
   dateLabel,
   monthLabel,
@@ -63,6 +65,7 @@ const getServerSnapshot = () => false;
 
 export default function SalarySummaryPage() {
   const workspace = useWorkspace();
+  const today = useJstDate();
   const [mode, setMode] = useState<"monthly" | "yearly">("monthly");
   const [view, setView] = useState<PayrollCalendarView>({
     month: "",
@@ -84,8 +87,12 @@ export default function SalarySummaryPage() {
   const [deleting, setDeleting] = useState<AttendanceRecord | null>(null);
   const [holidayOpen, setHolidayOpen] = useState(false);
   useEffect(() => {
-    const requested = new URLSearchParams(window.location.search).get("date");
-    const date = requested && validDate(requested) ? requested : localDate();
+    const params = new URLSearchParams(window.location.search);
+    const requested = params.get("date");
+    const requestedPeriod = params.get("period");
+    const date = requested && validDate(requested) ? requested
+      : requestedPeriod && validDate(`${requestedPeriod}-20`) ? `${requestedPeriod}-20`
+      : jstDate();
     setView(payrollViewForDate(date));
     setYear(payrollMonth(date).slice(0, 4));
     const query = window.matchMedia(mobileQuery);
@@ -96,11 +103,13 @@ export default function SalarySummaryPage() {
     query.addEventListener("change", closeOnDesktop);
     return () => query.removeEventListener("change", closeOnDesktop);
   }, []);
-  if (workspace.loading || workspace.error || !workspace.data || !month)
+  if (workspace.loading || workspace.error || !workspace.data || !month || !today)
     return <WorkspaceState error={workspace.error} retry={workspace.retry} />;
   const { records, holidays } = workspace.data;
   const activeRecords = records.filter((r) => r.status !== "deleted");
   const period = payrollPeriod(month);
+  const estimate = salaryEstimate(month, records, today);
+  const lastClosedMonth = latestClosedPayrollMonth(today);
   const monthlyRecords = activeRecords.filter(
     (r) => r.attendanceDate >= period.start && r.attendanceDate <= period.end,
   );
@@ -117,6 +126,7 @@ export default function SalarySummaryPage() {
     const key = `${year}-${String(index + 1).padStart(2, "0")}`;
     return {
       key,
+      estimate: salaryEstimate(key, records, today),
       ...sumRecords(
         yearlyRecords.filter((r) => payrollMonth(r.attendanceDate) === key),
       ),
@@ -124,7 +134,7 @@ export default function SalarySummaryPage() {
   });
   const maxSalary = Math.max(1, ...months.map((m) => m.salary));
   function changePeriod(value: string) {
-    const next = changePayrollPeriod(view, value, localDate());
+    const next = changePayrollPeriod(view, value, today);
     if (next === view) return;
     setView(next);
     setYear(next.month.slice(0, 4));
@@ -234,6 +244,11 @@ export default function SalarySummaryPage() {
             <p className="field-help">
               Tanggal kerja yang dihitung dalam ringkasan di bawah.
             </p>
+            {month !== lastClosedMonth && (
+              <button className="text-button mt-3" onClick={() => showMonth(lastClosedMonth)}>
+                Lihat periode terakhir selesai <ArrowRight aria-hidden="true" />
+              </button>
+            )}
           </div>
           <div className="payroll-period-controls">
             <button
@@ -293,10 +308,14 @@ export default function SalarySummaryPage() {
         <section className="panel metric metric-highlight">
           <h2 className="metric-label">
             <Wallet />
-            Estimasi pendapatan
+            {mode === "monthly" && estimate.net !== null
+              ? estimate.net < 0 ? "Selisih estimasi" : "Perkiraan gaji bersih"
+              : "Estimasi pendapatan kotor"}
           </h2>
-          <p className="metric-value">{yen(totals.salary)}</p>
-          <small>Dihitung dari catatan yang selesai</small>
+          <p className="metric-value">{estimateYen(mode === "monthly" && estimate.net !== null ? estimate.net : totals.salary)}</p>
+          <small>{mode === "monthly" && estimate.net !== null
+            ? estimate.net < 0 ? "Periksa kelengkapan absensi · bukan tagihan" : "Setelah estimasi potongan otomatis"
+            : "Dihitung dari catatan yang selesai"}</small>
         </section>
         <section className="panel metric">
           <h2 className="metric-label">
@@ -323,6 +342,7 @@ export default function SalarySummaryPage() {
           <small>Absensi selesai tercatat</small>
         </section>
       </div>
+      {mode === "monthly" && <SalaryDeductions estimate={estimate} />}
       {mode === "monthly" ? (
         <div className="calendar-layout">
           <section className="panel">
@@ -453,7 +473,7 @@ export default function SalarySummaryPage() {
             <span className="icon-tile">
               <Wallet />
             </span>
-            <h2>Pendapatan per periode gaji</h2>
+            <h2>Pendapatan kotor per periode gaji</h2>
           </div>
           <div className="year-chart" aria-hidden="true">
             {months.map((m) => (
@@ -476,6 +496,7 @@ export default function SalarySummaryPage() {
               <article className="year-item" key={m.key}>
                 <h3>{monthLabel(m.key).split(" ")[0]}</h3>
                 <strong>{yen(m.salary)}</strong>
+                {m.estimate.net !== null && <p className="year-net">{m.estimate.net < 0 ? "Selisih estimasi" : "Estimasi bersih"}: {estimateYen(m.estimate.net)}</p>}
                 <p>
                   {m.days
                     ? `${duration(m.minutes)} · ${m.days} hari kerja`

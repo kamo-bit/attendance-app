@@ -1,4 +1,5 @@
 import * as React from "react";
+import { ESTIMATE_NOTE, LOW_INCOME_NOTE, estimateYen, type SalaryEstimate } from "../../lib/salary-estimate";
 import {
   Body,
   Button,
@@ -29,6 +30,7 @@ interface SalarySummaryEmailProps {
   totalSalary: string;
   records?: DailyRecord[];
   summaryUrl?: string;
+  estimate?: SalaryEstimate;
 }
 
 // Literal colors and inline layout styles mirror globals.css for email clients.
@@ -71,7 +73,12 @@ export const SalarySummaryEmail = ({
   totalSalary = "¥0",
   records = [],
   summaryUrl = "https://www.absenkuy.cc/salary-summary",
-}: SalarySummaryEmailProps) => (
+  estimate,
+}: SalarySummaryEmailProps) => {
+  const net = estimate?.net ?? null;
+  const amount = net === null ? totalSalary : estimateYen(net);
+  const amountLabel = net === null ? "Estimasi pendapatan kotor" : net < 0 ? "Selisih estimasi" : "Perkiraan gaji bersih";
+  return (
   <Html lang="id">
     <Head>
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -121,7 +128,7 @@ export const SalarySummaryEmail = ({
       `}</style>
     </Head>
     <Preview>
-      {`${totalSalary} estimasi pendapatan · ${totalWorkDays} hari kerja · ${period}. Catatan kerjamu sudah dirangkum.`}
+      {`${amountLabel}: ${amount} · ${totalWorkDays} hari kerja · ${period}.`}
     </Preview>
     <Body
       className="email-body"
@@ -255,7 +262,7 @@ export const SalarySummaryEmail = ({
                         className="email-muted"
                         style={{ ...label, fontWeight: 700 }}
                       >
-                        ESTIMASI PENDAPATAN
+                        {amountLabel.toUpperCase()}
                       </Text>
                       <Text
                         className="email-amount email-text"
@@ -269,7 +276,7 @@ export const SalarySummaryEmail = ({
                           overflowWrap: "anywhere",
                         }}
                       >
-                        {totalSalary}
+                        {amount}
                       </Text>
                       <table
                         role="presentation"
@@ -333,6 +340,30 @@ export const SalarySummaryEmail = ({
                         </tbody>
                       </table>
                     </Section>
+                    {estimate?.status === "ready" && (
+                      <Section style={{ marginTop: "24px" }}>
+                        <Heading as="h2" className="email-text" style={{ margin: "0 0 12px", color: colors.text, fontSize: "19px", lineHeight: "26px" }}>Rincian estimasi potongan</Heading>
+                        <Text className="email-muted" style={{ ...label, marginBottom: "12px" }}>Dihitung otomatis sekali per periode gaji.</Text>
+                        <table width="100%" cellPadding="0" cellSpacing="0" style={{ tableLayout: "fixed" }} aria-label="Rincian estimasi potongan">
+                          <tbody>
+                            {[
+                              { key: "gross", label: "Estimasi pendapatan kotor", value: estimateYen(estimate.salary) },
+                              ...estimate.deductions.map(item => ({ key: item.key, label: item.label, value: `−${estimateYen(item.amount)}` })),
+                              { key: "total", label: "Total estimasi potongan", value: `−${estimateYen(estimate.totalDeductions)}` },
+                              { key: "net", label: amountLabel, value: amount },
+                            ].map(row => (
+                              <tr key={row.key}>
+                                <th scope="row" className="email-text email-border" style={{ ...paragraph, width: "60%", padding: "10px 8px 10px 0", textAlign: "left", fontWeight: row.key === "net" || row.key === "total" ? 700 : 400, color: colors.text, borderBottom: `1px solid ${colors.border}` }}>{row.label}</th>
+                                <td className="email-text email-border" style={{ ...paragraph, width: "40%", padding: "10px 0", textAlign: "right", fontWeight: 700, color: colors.text, borderBottom: `1px solid ${colors.border}`, overflowWrap: "anywhere" }}>{row.value}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        {net !== null && net < 0 && <Text className="email-muted" style={{ ...label, marginTop: "12px" }}>{LOW_INCOME_NOTE}</Text>}
+                        {estimate.draftCount > 0 && <Text className="email-muted" style={{ ...label, marginTop: "12px" }}>{estimate.draftCount} absensi draf belum masuk perhitungan.</Text>}
+                        <Text className="email-muted" style={{ ...label, marginTop: "12px" }}>{ESTIMATE_NOTE}</Text>
+                      </Section>
+                    )}
                     <Section
                       className="email-no-print"
                       style={{ padding: "24px 0" }}
@@ -527,5 +558,6 @@ export const SalarySummaryEmail = ({
     </Body>
   </Html>
 );
+};
 
 export default SalarySummaryEmail;

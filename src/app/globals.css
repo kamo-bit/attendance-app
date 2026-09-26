@@ -468,6 +468,65 @@
 .panel-gold {
   border-left-color: var(--gold);
 }
+.salary-deductions {
+  margin-bottom: 24px;
+}
+.salary-deductions .panel-title {
+  margin-bottom: 18px;
+  align-items: flex-start;
+}
+.deduction-list > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 0;
+  font-size: 14px;
+}
+.deduction-list dt {
+  min-width: 0;
+  color: var(--muted-foreground);
+}
+.deduction-list dd {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+.deduction-list .deduction-gross,
+.deduction-list .deduction-total {
+  border-bottom: 1px solid var(--border);
+  font-weight: 700;
+}
+.deduction-list .deduction-total {
+  border-top: 1px dashed var(--border);
+  margin-top: 8px;
+}
+.deduction-list .deduction-net {
+  margin-top: 14px;
+  padding: 16px;
+  border-radius: var(--shape-card);
+  background: var(--gold-soft);
+  flex-wrap: wrap;
+  font-weight: 750;
+}
+.deduction-net dt {
+  color: var(--foreground);
+}
+.deduction-net dd {
+  font-size: 24px;
+  overflow-wrap: anywhere;
+  flex-shrink: 1;
+}
+.deduction-note,
+.deduction-warning {
+  margin-top: 16px;
+}
+.deduction-warning {
+  color: var(--coral-text);
+}
+.year-item .year-net {
+  color: var(--teal-text);
+}
 .panel-coral {
   border-left-color: var(--coral);
 }
